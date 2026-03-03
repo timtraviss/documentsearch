@@ -85,6 +85,13 @@ The built app will be in `dist/Document Search.app`. You can move it to `/Applic
 - Open your default browser to the application
 - Run the server in the background (no terminal window)
 
+If port **5000** is already in use, you can choose a different port by setting the `PORT` environment variable before launching. The bundled launcher and `app.py` both respect this value:
+
+```bash
+export PORT=5001   # or any free port
+open dist/Document\ Search.app
+```
+
 ## Usage
 
 ### Text Search

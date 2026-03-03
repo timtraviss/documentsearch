@@ -32,10 +32,13 @@ def launch():
     print(f"Starting Document Search server...")
     print(f"App directory: {app_dir}")
     
+    # determine port (allow override via PORT env var)
+    port = int(os.getenv('PORT', 5000))
+
     # Start the Flask server in a background thread
     import threading
     server_thread = threading.Thread(
-        target=lambda: app.run(host='127.0.0.1', port=5000, debug=False, use_reloader=False),
+        target=lambda: app.run(host='127.0.0.1', port=port, debug=False, use_reloader=False),
         daemon=True
     )
     server_thread.start()
@@ -44,7 +47,7 @@ def launch():
     time.sleep(2)
     
     # Open in default browser
-    webbrowser.open('http://127.0.0.1:5000')
+    webbrowser.open(f'http://127.0.0.1:{port}')
     print("Opened Document Search in your browser.")
     
     # Keep the thread alive

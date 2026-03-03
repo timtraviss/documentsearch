@@ -390,4 +390,10 @@ def extract_invoice_number(text):
     return None
 
 if __name__ == "__main__":
-    app.run(host="127.0.0.1", port=5000, debug=True)
+    # allow port override via environment variable (useful when 5000 is occupied)
+    port = int(os.getenv("PORT", 5000))
+    try:
+        app.run(host="127.0.0.1", port=port, debug=True)
+    except OSError as e:
+        print(str(e))
+        print(f"Failed to start server on port {port}. You may need to choose a different PORT or stop the process using it.")

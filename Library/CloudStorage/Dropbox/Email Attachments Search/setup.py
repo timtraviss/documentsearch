@@ -12,13 +12,13 @@ from setuptools import setup
 OPTIONS = {
     'argv_emulation': False,
     'packages': [
+        'backend',
         'flask',
         'pdfminer',
         'dotenv',
         'jinja2',
     ],
     'includes': [
-        'backend',
         'backend.app',
         'backend.indexer',
         'backend.embeddings',
