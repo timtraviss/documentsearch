@@ -12,16 +12,26 @@ from setuptools import setup
 OPTIONS = {
     'argv_emulation': False,
     'packages': [
+        # backend package itself, plus some dependencies that py2app
+        # occasionally misses (especially those containing compiled
+        # extensions).  charset_normalizer is indirectly required by
+        # requests/httpx and the md__mypyc extension was not being bundled,
+        # leading to "No module named 'charset_normalizer.md__mypyc'" errors
+        # when reindexing.  Including the full package here forces it into
+        # the app.
         'backend',
         'flask',
         'pdfminer',
         'dotenv',
         'jinja2',
+        'charset_normalizer',
     ],
     'includes': [
         'backend.app',
         'backend.indexer',
         'backend.embeddings',
+        # explicitly include the compiled extension too, just in case
+        'charset_normalizer.md__mypyc',
     ],
     'resources': [
         'backend/templates',
