@@ -71,6 +71,20 @@ python backend/app.py
 
 Open your browser to **http://localhost:5000**
 
+### 6. (Optional) Build a macOS Application Bundle
+
+To create a standalone `.app` that can be double-clicked to launch:
+
+```bash
+python setup.py py2app
+```
+
+The built app will be in `dist/Document Search.app`. You can move it to `/Applications` or run it directly. The app will:
+
+- Start the Flask server automatically when opened
+- Open your default browser to the application
+- Run the server in the background (no terminal window)
+
 ## Usage
 
 ### Text Search
