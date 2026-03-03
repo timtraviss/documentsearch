@@ -391,7 +391,26 @@ def extract_invoice_number(text):
 
 if __name__ == "__main__":
     # allow port override via environment variable (useful when 5000 is occupied)
-    port = int(os.getenv("PORT", 5000))
+    import socket
+
+    def find_free(preferred):
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        try:
+            s.bind(('127.0.0.1', preferred))
+            return s.getsockname()[1]
+        except OSError:
+            s.bind(('127.0.0.1', 0))
+            return s.getsockname()[1]
+        finally:
+            s.close()
+
+    try:
+        candidate = int(os.getenv("PORT", 5000))
+    except ValueError:
+        candidate = 5000
+    port = find_free(candidate)
+    if port != candidate:
+        print(f"Port {candidate} unavailable, using {port} instead.")
     try:
         app.run(host="127.0.0.1", port=port, debug=True)
     except OSError as e:

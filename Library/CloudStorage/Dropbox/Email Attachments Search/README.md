@@ -85,13 +85,21 @@ The built app will be in `dist/Document Search.app`. You can move it to `/Applic
 - Open your default browser to the application
 - Run the server in the background (no terminal window)
 
-If port **5000** is already in use, you can choose a different port by setting the `PORT` environment variable before launching. The bundled launcher and `app.py` both respect this value:
+The launcher now tries to bind to **5000** by default but will automatically fall back to any free port if 5000 is occupied.
+You’ll see a console message such as:
+
+```
+Port 5000 unavailable, using 5003 instead.
+```
+
+You can still override this with the `PORT` environment variable if you prefer a specific port:
 
 ```bash
-export PORT=5001   # or any free port
+export PORT=5001   # preferred port
 open dist/Document\ Search.app
 ```
 
+Running `python backend/app.py` from the command line also uses the same auto‑selection logic. The bundle avoids crashing on port conflicts and prints any startup errors to stderr (visible in Terminal if you launch the app from there).
 ## Usage
 
 ### Text Search
