@@ -100,6 +100,9 @@ open dist/Document\ Search.app
 ```
 
 Running `python backend/app.py` from the command line also uses the same auto‑selection logic. The bundle avoids crashing on port conflicts and prints any startup errors to stderr (visible in Terminal if you launch the app from there).
+
+If the app does crash for some other reason when launched from Finder, a stack trace will be appended to `dist/Document Search.app/Contents/Resources/error.log` – open that file in a text editor to see the details. You can also start the app from a Terminal window to see output in real time.
+
 ## Usage
 
 ### Text Search
