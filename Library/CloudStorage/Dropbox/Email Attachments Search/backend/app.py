@@ -113,7 +113,8 @@ def reindex():
 
             _log("Starting reindex...")
 
-            from indexer import scan_pdfs, save_index
+            # use package-qualified import to work regardless of cwd
+            from backend.indexer import scan_pdfs, save_index
 
             folder = PDF_FOLDER or os.getenv("PDF_FOLDER")
             if not folder or not os.path.isdir(folder):

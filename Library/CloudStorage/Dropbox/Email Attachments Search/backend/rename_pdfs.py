@@ -255,7 +255,7 @@ def rename_pdfs(dry_run=False):
 def regenerate_index():
     """Regenerate the index after renaming."""
     print("\n🔄 Regenerating index...")
-    from indexer import scan_pdfs, save_index
+    from backend.indexer import scan_pdfs, save_index
     
     documents = scan_pdfs(PDF_FOLDER)
     save_index(documents)
