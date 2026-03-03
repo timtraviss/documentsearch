@@ -1,0 +1,6 @@
+Flask
+python-dotenv
+pdfminer.six
+faiss-cpu
+openai
+requests

@@ -1,0 +1,892 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Invoice Search</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        html, body {
+            height: 100%;
+            background: #ffffff;
+        }
+        
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', sans-serif;
+            color: #0d0d0d;
+            line-height: 1.6;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 2rem;
+            padding-top: 4rem;
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+        }
+        
+        .header {
+            margin-bottom: 2rem;
+        }
+        
+        h1 {
+            font-size: 2rem;
+            font-weight: 500;
+            margin-bottom: 0.25rem;
+            color: #0d0d0d;
+        }
+        
+        .subtitle {
+            color: #646464;
+            font-size: 0.95rem;
+        }
+        
+        .search-section {
+            margin-bottom: 2rem;
+        }
+        
+        .search-box {
+            display: flex;
+            gap: 0.75rem;
+        }
+        
+        input {
+            flex: 1;
+            padding: 0.85rem 1rem;
+            border: 1px solid #d1d5db;
+            border-radius: 6px;
+            font-size: 1rem;
+            transition: all 0.2s;
+            background: #ffffff;
+        }
+        
+        input:focus {
+            outline: none;
+            border-color: #9ca3af;
+            box-shadow: 0 0 0 3px rgba(156, 163, 175, 0.1);
+        }
+        
+        input::placeholder {
+            color: #9ca3af;
+        }
+        
+        button {
+            padding: 0.85rem 1.5rem;
+            background: #0d0d0d;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+        
+        button:hover {
+            background: #1a1a1a;
+        }
+        
+        button:active {
+            transform: scale(0.98);
+        }
+        
+        .search-btn {
+            padding: 0.6rem 1rem;
+            background: #f3f4f6;
+            color: #0d0d0d;
+            border: 1px solid #e5e7eb;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.85rem;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+        
+        .search-btn:hover {
+            background: #e5e7eb;
+            border-color: #d1d5db;
+        }
+        
+        .search-btn:active {
+            transform: scale(0.98);
+        }
+        
+        .results-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+            gap: 1rem;
+            flex: 1;
+        }
+        
+.result-card {
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            overflow: hidden;
+            transition: all 0.2s;
+            display: flex;
+            flex-direction: column;
+            background: #ffffff;
+        }
+        
+        .result-card:hover {
+            border-color: #d1d5db;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+        }
+        
+        .result-top {
+            display: flex;
+            gap: 1rem;
+            padding: 1rem;
+            border-bottom: 1px solid #f3f4f6;
+            flex: 1;
+        }
+        
+        .result-thumbnail {
+            width: 120px;
+            height: 120px;
+            min-width: 120px;
+            background: #f3f4f6;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            border-radius: 6px;
+        }
+        
+        .result-thumbnail canvas {
+            max-width: 100%;
+            max-height: 100%;
+        }
+        
+        .result-thumbnail .loading {
+            color: #9ca3af;
+            font-size: 0.75rem;
+            padding: 0.5rem;
+            text-align: center;
+        }
+        
+        .result-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            gap: 0.5rem;
+        }
+        
+        .result-title {
+            font-weight: 600;
+            color: #0d0d0d;
+            word-break: break-word;
+            font-size: 0.9rem;
+            line-height: 1.3;
+        }
+        
+        .result-snippet {
+            color: #646464;
+            font-size: 0.8rem;
+            line-height: 1.4;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+        
+        .result-actions {
+            padding: 0.75rem 1rem;
+            display: flex;
+            gap: 0.75rem;
+            width: 100%;
+        }
+        
+        .btn-sm {
+            flex: 1;
+            padding: 0.6rem;
+            background: #f3f4f6;
+            color: #0d0d0d;
+            border: 1px solid #e5e7eb;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.85rem;
+            font-weight: 500;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+        }
+        
+        .btn-sm:hover {
+            background: #e5e7eb;
+            border-color: #d1d5db;
+        }
+        
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            overflow: auto;
+        }
+        
+        .modal.show {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .modal-content {
+            background-color: white;
+            padding: 0;
+            border-radius: 8px;
+            width: 95%;
+            height: 90vh;
+            max-width: 1600px;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        }
+        
+        .modal-header {
+            padding: 1.5rem;
+            border-bottom: 1px solid #e5e7eb;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: #ffffff;
+        }
+        
+        .modal-header h2 {
+            margin: 0;
+            color: #0d0d0d;
+            font-size: 1.1rem;
+            font-weight: 500;
+            word-break: break-word;
+        }
+        
+        .close-btn {
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            cursor: pointer;
+            color: #9ca3af;
+            padding: 0;
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+        }
+        
+        .close-btn:hover {
+            color: #0d0d0d;
+        }
+        
+        .modal-body {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+        }
+        /* sidebar for instructions/versions */
+        .sidebar {
+            position: fixed;
+            top: 0;
+            left: -300px;
+            width: 300px;
+            height: 100%;
+            background: #fafafa;
+            box-shadow: 2px 0 8px rgba(0,0,0,0.1);
+            padding: 1rem;
+            overflow-y: auto;
+            transition: left 0.3s;
+            z-index: 1100;
+        }
+        .sidebar.show {
+            left: 0;
+        }
+        .sidebar h2,
+        .sidebar h3 {
+            margin-top: 1rem;
+        }
+        .sidebar .close-btn {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+        }
+        /* fixed info button at top-left */
+        #toggleSidebarBtn {
+            position: fixed;
+            top: 12px;
+            left: 12px;
+            z-index: 1200;
+        }
+        
+        .pdf-viewer {
+            flex: 2;
+            overflow-y: auto;
+            padding: 1.5rem;
+            background: #f9fafb;
+        }
+        
+        .pdf-canvas-container {
+            display: flex;
+            justify-content: center;
+            margin-bottom: 1rem;
+        }
+        
+        #pdfCanvas {
+            max-width: 100%;
+            border: 1px solid #e5e7eb;
+            background: white;
+            border-radius: 6px;
+        }
+        
+        .summary-panel {
+            flex: 1;
+            padding: 1.5rem;
+            overflow-y: auto;
+            border-left: 1px solid #e5e7eb;
+            background: #ffffff;
+        }
+        
+        .summary-section {
+            margin-bottom: 2rem;
+        }
+        
+        .summary-section h3 {
+            color: #0d0d0d;
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+            margin-bottom: 0.75rem;
+            color: #646464;
+        }
+        
+        .summary-value {
+            color: #0d0d0d;
+            font-size: 0.9rem;
+            line-height: 1.6;
+            word-break: break-word;
+        }
+        
+        .summary-list {
+            list-style: none;
+            padding: 0;
+        }
+        
+        .summary-list li {
+            padding: 0.5rem 0;
+            color: #0d0d0d;
+            font-size: 0.9rem;
+            border-bottom: 1px solid #f3f4f6;
+        }
+        
+        .summary-list li:last-child {
+            border-bottom: none;
+        }
+        
+        .loading {
+            text-align: center;
+            color: #9ca3af;
+            padding: 3rem;
+        }
+        
+.no-results {
+            text-align: center;
+            color: #9ca3af;
+            padding: 3rem;
+        }
+        
+        .results-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+        
+        .results-count {
+            color: #646464;
+            font-size: 0.95rem;
+            font-weight: 500;
+        }
+        
+        @media (max-width: 1024px) {
+            .modal-body {
+                flex-direction: column;
+            }
+            .summary-panel {
+                border-left: none;
+                border-top: 1px solid #e5e7eb;
+                max-height: 300px;
+            }
+            .results-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- sidebar with instructions/version/log -->
+    <button id="toggleSidebarBtn" class="search-btn" title="Info">☰</button>
+    <div id="sidebar" class="sidebar">
+        <button class="close-btn" onclick="toggleSidebar()">×</button>
+        <h2>Instructions &amp; info</h2>
+        <p><strong>Version:</strong> {{ version }}</p>
+        <h3>Keyboard shortcuts</h3>
+        <ul>
+            <li><code>⌘/Ctrl + F</code> – focus search box</li>
+            <li><code>Enter</code> – submit search</li>
+            <li><code>Esc</code> or <code>⌘/Ctrl + Shift +C</code> – clear form</li>
+            <li><code>⌘/Ctrl + Shift + F</code> – toggle filters</li>
+            <li><code>⌘/Ctrl + Shift + M</code> – switch OR/AND mode</li>
+            <li><code>⌘/Ctrl + R</code> – open re‑index modal</li>
+        </ul>
+    </div>
+    <div class="container">
+        <div class="header">
+            <h1>Document Search</h1>
+            <p class="subtitle">Find documents from your email attachments</p>
+        </div>
+        
+<div class="search-section">
+            <form id="searchForm" class="search-box">
+                <input type="text" name="q" id="q" placeholder="Search by keyword, vendor, amount, date..." autocomplete="off" />
+                <button type="submit" class="search-btn">Search</button>
+                <button id="clearBtn" type="button" class="search-btn">Clear</button>
+                <button id="advancedToggle" type="button" class="search-btn">⚙️ Filters</button>
+                <button id="reindexBtn" type="button" class="search-btn">Re-index PDFs</button>
+            </form>
+                        <!-- Advanced filters (hidden by default) -->
+            <div id="advancedFilters" style="display:none; margin-top:1rem; padding:1rem; background:#f9fafb; border-radius:6px; border:1px solid #e5e7eb;">
+                <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:0.75rem;">
+                    <div>
+                        <label style="font-size:0.85rem;color:#646464;display:block;margin-bottom:4px;">Company/Vendor</label>
+                        <input id="filterCompany" type="text" placeholder="e.g., Acme Corp" style="width:100%;padding:0.6rem;border:1px solid #e5e7eb;border-radius:6px;font-size:0.9rem;" />
+                    </div>
+                    <div>
+                        <label style="font-size:0.85rem;color:#646464;display:block;margin-bottom:4px;">Year or Date</label>
+                        <input id="filterDate" type="text" placeholder="e.g., 2025 or 2025-03" style="width:100%;padding:0.6rem;border:1px solid #e5e7eb;border-radius:6px;font-size:0.9rem;" />
+                    </div>
+                    <div>
+                        <label style="font-size:0.85rem;color:#646464;display:block;margin-bottom:4px;">Amount (min-max)</label>
+                        <input id="filterAmount" type="text" placeholder="e.g., 1000-5000" style="width:100%;padding:0.6rem;border:1px solid #e5e7eb;border-radius:6px;font-size:0.9rem;" />
+                    </div>
+                    <div style="display:flex; align-items:center;">
+                        <input type="checkbox" id="filterModeOr" />
+                        <label for="filterModeOr" style="margin-left:6px; font-size:0.85rem; color:#646464;">Match any (OR)</label>
+                    </div>
+                </div>
+            </div>
+        <div id="resultsHeader" class="results-header" style="display:none;">
+            <span class="results-count" id="resultsCount"></span>
+        </div>
+        <div id="results" class="results-grid"></div>
+    </div>
+
+    <!-- PDF Viewer Modal -->
+    <div id="pdfModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="modalTitle">Invoice</h2>
+                <button class="close-btn" onclick="closePdfModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="pdf-viewer">
+                    <div class="pdf-canvas-container">
+                        <canvas id="pdfCanvas"></canvas>
+                    </div>
+                </div>
+                <div class="summary-panel" id="summaryPanel">
+                    <div class="loading">Loading summary...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Reindex Confirmation Modal -->
+    <div id="reindexModal" class="modal">
+        <div class="modal-content" style="max-width:720px; height:auto;">
+            <div class="modal-header">
+                <h2>Re-index PDFs</h2>
+                <button class="close-btn" onclick="closeReindexModal()">&times;</button>
+            </div>
+            <div style="padding:1.25rem;">
+                <p style="color:#0d0d0d; margin-bottom:0.75rem;">This will scan your `PDF_FOLDER`, extract text from each PDF, and overwrite the search index. This can take a few seconds to minutes depending on how many files you have.</p>
+                <div id="tokenRow" style="margin-bottom:0.75rem; display: none;">
+                    <label style="font-size:0.9rem;color:#646464;display:block;margin-bottom:6px;">Re-index token (required)</label>
+                    <input id="reindexTokenInput" type="password" placeholder="Enter token" style="width:100%; padding:0.6rem; border:1px solid #e5e7eb; border-radius:6px;" />
+                </div>
+                <div style="display:flex; gap:0.5rem; align-items:center;">
+                    <button id="confirmReindexBtn" class="btn-sm" style="background:#0d0d0d;color:#fff;">Start Re-index</button>
+                    <button class="btn-sm" onclick="closeReindexModal()">Cancel</button>
+                </div>
+                <div id="reindexLog" style="margin-top:1rem; max-height:220px; overflow:auto; background:#0f1724; color:#e6eef8; padding:0.75rem; border-radius:6px; font-family:monospace; font-size:0.85rem; display:none;"></div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js"></script>
+    <script>
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+        // sidebar toggle
+        function toggleSidebar() {
+            const sb = document.getElementById('sidebar');
+            sb.classList.toggle('show');
+        }
+        document.getElementById('toggleSidebarBtn')?.addEventListener('click', toggleSidebar);
+
+        // global keyboard shortcuts
+        document.addEventListener('keydown', (e) => {
+            const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
+            const meta = isMac ? e.metaKey : e.ctrlKey;
+            if (meta && e.key.toLowerCase() === 'f') {
+                e.preventDefault();
+                document.getElementById('q').focus();
+            }
+            if (meta && e.shiftKey && e.key.toLowerCase() === 'c') {
+                // clear
+                document.getElementById('clearBtn').click();
+            }
+            if (meta && e.shiftKey && e.key.toLowerCase() === 'f') {
+                document.getElementById('advancedToggle').click();
+            }
+            if (meta && e.shiftKey && e.key.toLowerCase() === 'm') {
+                const cb = document.getElementById('filterModeOr');
+                cb.checked = !cb.checked;
+            }
+            if (meta && e.key.toLowerCase() === 'r') {
+                document.getElementById('reindexBtn').click();
+            }
+        });
+
+        document.getElementById('searchForm').onsubmit = async (e) => {
+            e.preventDefault();
+            const q = document.getElementById('q').value.trim();
+            const filterCompany = document.getElementById('filterCompany').value.trim();
+            const filterDate = document.getElementById('filterDate').value.trim();
+            const filterAmount = document.getElementById('filterAmount').value.trim();
+            
+            if (!q && !filterCompany && !filterDate && !filterAmount) return;
+            
+            const container = document.getElementById('results');
+            const header = document.getElementById('resultsHeader');
+            container.innerHTML = '<div class="loading">Searching...</div>';
+            header.style.display = 'none';
+            
+            try {
+                // Build query string with filters and mode
+                let queryStr = `/search?q=${encodeURIComponent(q)}`;
+                if (filterCompany) queryStr += `&company=${encodeURIComponent(filterCompany)}`;
+                if (filterDate) queryStr += `&date=${encodeURIComponent(filterDate)}`;
+                if (filterAmount) queryStr += `&amount=${encodeURIComponent(filterAmount)}`;
+                const orMode = document.getElementById('filterModeOr').checked;
+                if (orMode) {
+                    queryStr += `&mode=or`;
+                }
+                
+                const resp = await fetch(queryStr);
+                const results = await resp.json();
+                
+                container.innerHTML = '';
+                if (results.length === 0) {
+                    container.innerHTML = '<div class="no-results">No results found. Try different keywords or filters.</div>';
+                    header.style.display = 'none';
+                    return;
+                }
+                
+                // Show results count
+                header.style.display = 'flex';
+                document.getElementById('resultsCount').textContent = `${results.length} ${results.length === 1 ? 'result' : 'results'} found`;
+                
+                results.forEach((doc) => {
+                    const div = document.createElement('div');
+                    div.className = 'result-card';
+                    
+                    const filename = doc.filename || 'Unknown';
+                    const path = doc.path || '';
+                    const snippet = (doc.snippet || '').substring(0, 120).replace(/\n/g, ' ');
+                    
+                    div.innerHTML = `
+                        <div class="result-top">
+                            <div class="result-thumbnail">
+                                <div class="loading">Loading...</div>
+                            </div>
+                            <div class="result-content">
+                                <div class="result-title">${filename}</div>
+                                <div class="result-snippet">${snippet}</div>
+                            </div>
+                        </div>
+                        <div class="result-actions">
+                            <button class="btn-sm" onclick="viewPdf('${path.replace(/'/g, "\\'")}', '${filename.replace(/'/g, "\\'")}')" style="flex: 2;">View</button>
+                            <button class="btn-sm" onclick="downloadPdf('${path.replace(/'/g, "\\'")}')">Download</button>
+                        </div>
+                    `;
+                    container.appendChild(div);
+                    
+                    // Render PDF thumbnail asynchronously
+                    renderPdfThumbnail(path, div.querySelector('.result-thumbnail'));
+                });
+            } catch (err) {
+                container.innerHTML = '<div class="no-results">Error: ' + err.message + '</div>';
+                header.style.display = 'none';
+            }
+        };
+        
+        async function renderPdfThumbnail(pdfPath, container) {
+            try {
+                const pdf = await pdfjsLib.getDocument(`/pdf/${encodeURIComponent(pdfPath)}`).promise;
+                const page = await pdf.getPage(1);
+                
+                const canvas = document.createElement('canvas');
+                const context = canvas.getContext('2d');
+                const viewport = page.getViewport({ scale: 0.75 });
+                
+                canvas.width = viewport.width;
+                canvas.height = viewport.height;
+                
+                await page.render({
+                    canvasContext: context,
+                    viewport: viewport
+                }).promise;
+                
+                container.innerHTML = '';
+                container.appendChild(canvas);
+            } catch (err) {
+                container.innerHTML = '<div style="color: #9ca3af; font-size: 0.85rem;">Preview unavailable</div>';
+            }
+        }
+
+        // Toggle advanced filters panel
+        document.getElementById('advancedToggle').onclick = (e) => {
+            e.preventDefault();
+            const filters = document.getElementById('advancedFilters');
+            filters.style.display = filters.style.display === 'none' ? 'block' : 'none';
+        };
+
+        // Clear all search fields and results
+        document.getElementById('clearBtn').onclick = (e) => {
+            e.preventDefault();
+            document.getElementById('q').value = '';
+            document.getElementById('filterCompany').value = '';
+            document.getElementById('filterDate').value = '';
+            document.getElementById('filterAmount').value = '';
+            document.getElementById('filterModeOr').checked = false;
+            document.getElementById('results').innerHTML = '';
+            document.getElementById('resultsHeader').style.display = 'none';
+        };
+
+        // Re-index: open confirmation modal
+        document.getElementById('reindexBtn').onclick = () => {
+            openReindexModal();
+        };
+
+        // Helper UI for reindex modal
+        function openReindexModal() {
+            const modal = document.getElementById('reindexModal');
+            modal.classList.add('show');
+            const tokenRequired = {{ 'true' if reindex_token_present else 'false' }};
+            if (tokenRequired) {
+                document.getElementById('tokenRow').style.display = 'block';
+            }
+        }
+
+        function closeReindexModal() {
+            const modal = document.getElementById('reindexModal');
+            modal.classList.remove('show');
+            // hide logs
+            document.getElementById('reindexLog').style.display = 'none';
+            document.getElementById('reindexLog').textContent = '';
+        }
+
+        async function pollReindexStatus() {
+            try {
+                const resp = await fetch('/reindex/status');
+                return await resp.json();
+            } catch (e) {
+                return { running: false, logs: ['poll failed: ' + e.message] };
+            }
+        }
+
+        document.getElementById('confirmReindexBtn').onclick = async () => {
+            const btn = document.getElementById('confirmReindexBtn');
+            btn.disabled = true;
+            const token = document.getElementById('reindexTokenInput') ? document.getElementById('reindexTokenInput').value : null;
+
+            // show log container
+            const logEl = document.getElementById('reindexLog');
+            logEl.style.display = 'block';
+            logEl.textContent = '';
+
+            try {
+                const headers = {};
+                if (token) headers['X-Reindex-Token'] = token;
+
+                const resp = await fetch('/reindex', { method: 'POST', headers });
+                const data = await resp.json();
+                if (!data || data.status !== 'ok') {
+                    logEl.textContent += 'Failed to start reindex: ' + (data && data.error ? data.error : 'unknown') + '\n';
+                    btn.disabled = false;
+                    return;
+                }
+
+                // poll until finished
+                let lastLogs = 0;
+                while (true) {
+                    const status = await pollReindexStatus();
+                    if (status.logs && status.logs.length > lastLogs) {
+                        for (let i = lastLogs; i < status.logs.length; i++) {
+                            logEl.textContent += status.logs[i] + '\n';
+                        }
+                        lastLogs = status.logs.length;
+                        logEl.scrollTop = logEl.scrollHeight;
+                    }
+
+                    if (!status.running) {
+                        if (status.error) {
+                            logEl.textContent += 'Error: ' + status.error + '\n';
+                        } else {
+                            logEl.textContent += 'Done. Indexed ' + (status.count || 0) + ' documents.\n';
+                        }
+                        break;
+                    }
+                    await new Promise(r => setTimeout(r, 1000));
+                }
+            } catch (err) {
+                logEl.textContent += 'Request failed: ' + err.message + '\n';
+            } finally {
+                btn.disabled = false;
+            }
+        };
+        
+        async function viewPdf(path, filename) {
+            const modal = document.getElementById('pdfModal');
+            document.getElementById('modalTitle').textContent = filename;
+            modal.classList.add('show');
+            
+            try {
+                const pdf = await pdfjsLib.getDocument(`/pdf/${encodeURIComponent(path)}`).promise;
+                const page = await pdf.getPage(1);
+                
+                const canvas = document.getElementById('pdfCanvas');
+                const context = canvas.getContext('2d');
+                const viewport = page.getViewport({ scale: 1.5 });
+                
+                canvas.width = viewport.width;
+                canvas.height = viewport.height;
+                
+                await page.render({
+                    canvasContext: context,
+                    viewport: viewport
+                }).promise;
+            } catch (err) {
+                console.error('PDF rendering error:', err);
+            }
+            
+            loadSummary(path);
+        }
+        
+        async function loadSummary(path) {
+            const panel = document.getElementById('summaryPanel');
+            try {
+                const resp = await fetch(`/summary/${encodeURIComponent(path)}`);
+                const data = await resp.json();
+                
+                if (data.error) {
+                    panel.innerHTML = `<div style="color: #9ca3af;">No summary available</div>`;
+                    return;
+                }
+                
+                let html = '';
+                
+                // Company
+                if (data.company) {
+                    html += `
+                        <div class="summary-section">
+                            <h3>Company</h3>
+                            <div class="summary-value" style="font-size: 1rem; font-weight: 500;">${escapeHtml(data.company)}</div>
+                        </div>
+                    `;
+                }
+                
+                // Date
+                if (data.date) {
+                    html += `
+                        <div class="summary-section">
+                            <h3>Date</h3>
+                            <div class="summary-value">${escapeHtml(data.date)}</div>
+                        </div>
+                    `;
+                }
+                
+                // Amount
+                if (data.amount) {
+                    html += `
+                        <div class="summary-section">
+                            <h3>Amount</h3>
+                            <div class="summary-value" style="font-size: 1.2rem; font-weight: 600; color: #0d0d0d;">${escapeHtml(data.amount)}</div>
+                        </div>
+                    `;
+                }
+                
+                // Invoice Number
+                if (data.invoice_number) {
+                    html += `
+                        <div class="summary-section">
+                            <h3>Invoice #</h3>
+                            <div class="summary-value">${escapeHtml(data.invoice_number)}</div>
+                        </div>
+                    `;
+                }
+                
+                if (!data.company && !data.date && !data.amount && !data.invoice_number) {
+                    html = '<div style="color: #9ca3af; text-align: center; padding: 1rem;">No structured data found</div>';
+                }
+                
+                panel.innerHTML = html;
+            } catch (err) {
+                panel.innerHTML = `<div style="color: #9ca3af;">Could not load summary</div>`;
+            }
+        }
+        
+        function escapeHtml(text) {
+            const map = {
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                '"': '&quot;',
+                "'": '&#039;'
+            };
+            return text.replace(/[&<>"']/g, m => map[m]);
+        }
+        
+        function closePdfModal() {
+            const modal = document.getElementById('pdfModal');
+            modal.classList.remove('show');
+        }
+        
+        function downloadPdf(path) {
+            const link = document.createElement('a');
+            link.href = `/pdf/${encodeURIComponent(path)}`;
+            link.download = path.split('/').pop();
+            link.click();
+        }
+        
+        window.onclick = function(event) {
+            const modal = document.getElementById('pdfModal');
+            if (event.target === modal) {
+                closePdfModal();
+            }
+        };
+    </script>
+</body>
+</html>

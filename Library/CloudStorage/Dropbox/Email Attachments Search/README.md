@@ -1,0 +1,205 @@
+# Email Attachments Search
+
+An AI-powered web application to search and quickly locate PDF invoices in your `Email Attachments` folder. The app provides both keyword-based and semantic AI search, with direct links and previews.
+
+## Features
+
+✨ **Dual Search Modes**
+- **Text Search**: Fast keyword matching (always available)
+- **AND/OR Filter Mode**: When using advanced filters (company, date, amount) you can toggle between matching all criteria or any criteria via the checkbox in the UI
+- **Semantic AI Search**: Understanding query intent and content meaning (requires OpenAI API key)
+
+📎 **Document Management**
+- Automatic PDF scanning and indexing
+- Text extraction from all PDFs
+- Metadata tracking (filename, path)
+
+🔍 **Smart UI**
+- Clean, intuitive search interface
+- Result snippets for quick preview
+- Direct links to open/download PDFs
+- Responsive design
+
+## Quick Start
+
+### 1. Install Dependencies
+
+```bash
+cd '/Users/timothytraviss/Library/CloudStorage/Dropbox/Email Attachments Search'
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+```
+
+### 2. Configure Environment
+
+Copy `.env.example` to `.env` and update values:
+
+```bash
+cp .env.example .env
+```
+
+Edit `.env`:
+```env
+OPENAI_API_KEY=sk-...  # (optional, for AI-powered semantic search)
+PDF_FOLDER=/Users/timothytraviss/Library/CloudStorage/Dropbox/Email Attachments
+```
+
+### 3. Index PDF Documents
+
+```bash
+python backend/indexer.py
+```
+
+This scans your PDF folder and creates `backend/index.json` with extracted text from all documents.
+
+### 4. Generate Embeddings (Optional)
+
+For semantic AI-powered search, you'll need an OpenAI API key:
+
+```bash
+python backend/embeddings.py
+```
+
+This creates `backend/vector.faiss` (vector database) and `backend/metadata.json`.
+
+### 5. Run the Web App
+
+```bash
+python backend/app.py
+```
+
+Open your browser to **http://localhost:5000**
+
+## Usage
+
+### Text Search
+Enter keywords like:
+- `invoice 12345`
+- `acme corp`
+- `pending`
+- `2025-03-02`
+
+### Sidebar & Help
+Click the **Info** button (top‑right) or press `⌘/Ctrl+F` and then `☰` to open the sidebar. It shows
+- keyboard shortcuts
+- current app version
+
+**Change history lives here in the README**; the on‑screen sidebar no longer displays it. Update this file whenever you make modifications.
+
+
+You can also add query parameters for advanced filtering. Examples:
+
+- `/search?q=invoice&company=acme`
+- `/search?q=&date=2024&amount=1000-5000&mode=or`  *(mode can be `and` or `or`)*
+
+### Semantic Search (with embeddings)
+Ask natural questions:
+- "Show me invoices from March"
+- "Find unpaid bills"
+- "Vendor Johnson and Associates"
+- "Amount over 5000"
+
+## File Structure
+
+```
+Email Attachments Search/
+├── backend/
+│   ├── app.py                 # Flask web app
+│   ├── indexer.py             # PDF scanner & text extractor
+│   ├── embeddings.py          # AI embeddings & vector search
+│   ├── create_embeddings.sh   # Helper script
+│   ├── index.json             # Indexed documents (generated)
+│   ├── vector.faiss           # Vector database (generated)
+│   ├── metadata.json          # Metadata index (generated)
+│   ├── templates/
+│   │   └── search.html        # Web UI
+│   └── static/                # CSS/JS assets
+├── .env                       # Configuration (create from .env.example)
+├── requirements.txt           # Python dependencies
+└── README.md                  # This file
+```
+
+## Configuration
+
+### Environment Variables
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `OPENAI_API_KEY` | ❌ No | OpenAI API key for semantic search (get from [openai.com](https://platform.openai.com/api-keys)) |
+| `PDF_FOLDER` | ✅ Yes | Path to your Email Attachments folder |
+
+## Troubleshooting
+
+### "PDF_FOLDER not configured or does not exist"
+- Check that `PDF_FOLDER` in `.env` points to a valid directory
+- Verify the folder contains PDF files
+
+### Semantic search not working
+- Ensure `OPENAI_API_KEY` is set in `.env`
+- Run `python backend/embeddings.py` to generate vector database
+- Check that `backend/vector.faiss` exists
+
+### PDF preview not loading
+- Verify the PDF file still exists in the original folder
+- Check file permissions
+
+## Development
+
+### Automation / Scheduled Tasks
+
+If you have a weekly script or coworker skill that scans the folder or relies on
+file names, update it to work with the latest workflow:
+
+1. **Don't hard‑code file names.** The renaming process (see rename_pdfs.py)
+   may change names to `<Company>_<YYYY-MM-DD>.pdf`. Instead, consume the
+   `backend/index.json` index which is kept in sync whenever you run the
+   renamer or the indexer.
+2. **Rebuild the index each run.** A simple cron/Task Scheduler entry can run:
+
+    ```bash
+    source venv/bin/activate
+    python backend/indexer.py          # updates index.json
+    python backend/embeddings.py  # optional, rebuild vectors
+    ```
+
+3. **Trigger renaming periodically.** If you want the weekly job to perform
+   renaming first (useful for new incoming attachments), include:
+
+    ```bash
+    python backend/rename_pdfs.py --dry-run   # preview
+    python backend/rename_pdfs.py             # apply and rebuild
+    ```
+
+4. **Use the index for searches.** Any consumer (web UI or other tool) can
+   read and filter the JSON documents rather than walking the filesystem, so
+   path changes are transparent.
+
+Keeping the scheduler pointed at the index ensures no manual adjustments are
+needed when filenames change.
+
+## Development
+
+### Updating after adding new PDFs
+Simply re-run the indexer:
+```bash
+python backend/indexer.py
+python backend/embeddings.py  # if using AI search
+```
+
+### Extending the app
+- **Add filters**: Modify `app.py` search routes
+- **Custom UI**: Edit `backend/templates/search.html`
+- **Vector search tuning**: Adjust parameters in `embeddings.py`
+
+## Technology Stack
+
+- **Backend**: Python 3 + Flask
+- **PDF Processing**: pdfminer.six
+- **Vector Search**: FAISS (Facebook AI Similarity Search)
+- **AI Embeddings**: OpenAI API
+- **Frontend**: HTML5 + Vanilla JavaScript
+
+## License
+
+Private project for personal use.
