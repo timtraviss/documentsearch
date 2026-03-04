@@ -18,20 +18,24 @@ OPTIONS = {
         # requests/httpx and the md__mypyc extension was not being bundled,
         # leading to "No module named 'charset_normalizer.md__mypyc'" errors
         # when reindexing.  Including the full package here forces it into
-        # the app.
+        # the app.  Similarly, cffi is required by cryptography (which is used
+        # for security operations), and its compiled _cffi_backend module must
+        # be explicitly included to avoid "No module named '_cffi_backend'" errors.
         'backend',
         'flask',
         'pdfminer',
         'dotenv',
         'jinja2',
         'charset_normalizer',
+        'cffi',
     ],
     'includes': [
         'backend.app',
         'backend.indexer',
         'backend.embeddings',
-        # explicitly include the compiled extension too, just in case
+        # explicitly include compiled extensions
         'charset_normalizer.md__mypyc',
+        '_cffi_backend',
     ],
     'resources': [
         'backend/templates',
