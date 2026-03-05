@@ -39,6 +39,7 @@ OPTIONS = {
     ],
     'resources': [
         'backend/templates',
+        'backend/static',
         '.env.example',
     ],
     'excludes': [
@@ -67,6 +68,5 @@ setup(
     author='Timothy Traviss',
     url='https://github.com/timtraviss/documentsearch',
     app=['app_launcher.py'],
-    icon='app_icon.icns',
     options={'py2app': OPTIONS},
 )
