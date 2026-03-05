@@ -165,12 +165,14 @@ def text_search(q, filter_company="", filter_date="", filter_amount="", filter_m
 
     filter_mode may be "and" (all filters must match) or "or" (any filter).
     """
+    _STOP_WORDS = {'a', 'an', 'the', 'at', 'in', 'on', 'of', 'for', 'to', 'and', 'or', 'is', 'was', 'are', 'with', 'by', 'from'}
     results = []
-    q_lower = q.lower()
-    
+    tokens = [t for t in q.lower().split() if t not in _STOP_WORDS] if q else []
+
     for doc in documents:
-        # Check keyword match
-        text_match = (not q) or (q_lower in doc.get("text", "").lower() or q_lower in doc.get("filename", "").lower())
+        # Check keyword match — all meaningful tokens must appear in text or filename
+        doc_text = (doc.get("text", "") + " " + doc.get("filename", "")).lower()
+        text_match = (not tokens) or all(t in doc_text for t in tokens)
         if not text_match:
             continue
         
