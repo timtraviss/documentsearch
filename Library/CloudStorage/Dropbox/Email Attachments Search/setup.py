@@ -40,6 +40,7 @@ OPTIONS = {
     'resources': [
         'backend/templates',
         'backend/static',
+        '.env',
         '.env.example',
     ],
     'excludes': [
