@@ -11,6 +11,7 @@ echo "Syncing source → bundle..."
 
 cp "$SRC/app.py"                  "$BUNDLE/app.py"
 cp "$SRC/templates/search.html"   "$BUNDLE/templates/search.html"
+cp "app_launcher.py"              "dist/Document Search.app/Contents/Resources/app_launcher.py"
 
 # Clear cached bytecode so Python picks up the new source
 rm -f "$BUNDLE/__pycache__/app"*.pyc

@@ -100,11 +100,15 @@ def search():
             if not doc:
                 continue
             text = doc.get("text", "")
+            fname = doc.get("filename", "")
             results.append({
-                "filename": doc["filename"],
+                "filename": fname,
                 "path": rel_path,
                 "snippet": text[:300],
-                "company": tag.get("company") or extract_company(text) or "",
+                "company": (tag.get("company")
+                            or extract_company(text)
+                            or extract_company_from_filename(fname)
+                            or ""),
                 "date": tag.get("year") or extract_date(text) or "",
                 "amount": extract_total_amount(text) or "",
                 "tags": tag,
@@ -236,11 +240,15 @@ def get_doc_tags(filename):
         for doc in documents:
             if doc.get("relative_path") == filename or doc.get("path", "").endswith(filename):
                 text = doc.get("text", "")
+                fname = doc.get("filename", "")
                 date = extract_date(text) or ""
                 year = date[:4] if date else ""
+                company = (extract_company(text)
+                           or extract_company_from_filename(fname)
+                           or "")
                 tag = {
                     "type": "", "status": "",
-                    "company": extract_company(text) or "",
+                    "company": company,
                     "year": year,
                     "auto": True,
                 }
@@ -380,6 +388,27 @@ def get_summary(filename):
         return jsonify(summary)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+def extract_company_from_filename(filename):
+    """Try to infer a company name from the PDF filename.
+
+    Many filenames look like 'Spark Invoice 2024.pdf' or 'spark_nz_receipt_01.pdf'.
+    We strip the extension, replace separators, remove common noise words and
+    return the first meaningful words as a candidate company name.
+    """
+    import re
+    name = os.path.splitext(filename)[0]
+    name = re.sub(r'[_\-]+', ' ', name)
+    # Remove common document-type and date noise
+    noise = (r'\b(invoice|receipt|statement|quote|contract|tax|gst|nz|pdf|'
+             r'final|draft|copy|order|ref|no|number|'
+             r'\d{4}|\d{1,2}[/-]\d{1,2}(?:[/-]\d{2,4})?)\b')
+    cleaned = re.sub(noise, '', name, flags=re.IGNORECASE).strip()
+    words = [w for w in cleaned.split() if len(w) > 1]
+    if words:
+        return ' '.join(words[:3])
+    return None
+
 
 def extract_company(text):
     """Extract company/vendor name from text."""

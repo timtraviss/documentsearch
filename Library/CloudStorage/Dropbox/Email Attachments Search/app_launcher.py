@@ -59,7 +59,7 @@ def launch():
         import threading
         def run_server():
             try:
-                app.run(host='127.0.0.1', port=port, debug=False, use_reloader=False)
+                app.run(host='127.0.0.1', port=port, debug=False, use_reloader=False, threaded=True)
             except Exception as e:
                 # log failure to stderr and exit so py2app doesn't show generic error page
                 print(f"Server failed to start: {e}")

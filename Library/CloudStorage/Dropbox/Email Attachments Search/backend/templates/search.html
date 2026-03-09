@@ -864,13 +864,19 @@
         async function loadSummary(path) {
             currentModalPath = path;
             const panel = document.getElementById('summaryPanel');
+
+            // Fetch summary and tags independently so one failure doesn't block the other
+            let data = {}, tags = {};
             try {
-                const [summaryResp, tagsResp] = await Promise.all([
-                    fetch(`/summary/${encodeURIComponent(path)}`),
-                    fetch(`/tags/${encodeURIComponent(path)}`)
-                ]);
-                const data = await summaryResp.json();
-                const tags = tagsResp.ok ? await tagsResp.json() : {};
+                const resp = await fetch(`/summary/${encodeURIComponent(path)}`);
+                if (resp.ok) data = await resp.json();
+            } catch(e) { console.error('Summary fetch error:', e); }
+            try {
+                const resp = await fetch(`/tags/${encodeURIComponent(path)}`);
+                if (resp.ok) tags = await resp.json();
+            } catch(e) { console.error('Tags fetch error:', e); }
+
+            try {
 
                 let html = '';
 
