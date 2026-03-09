@@ -430,9 +430,8 @@
             font-size: 0.72rem; font-weight: 500;
         }
         .tag-type { background: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; }
-        .tag-status-unpaid { background: #fff7ed; color: #c2410c; border: 1px solid #fed7aa; }
-        .tag-status-paid { background: #f0fdf4; color: #15803d; border: 1px solid #bbf7d0; }
-        .tag-status-archived { background: #f3f4f6; color: #6b7280; border: 1px solid #e5e7eb; }
+        .tag-company { background: #f0fdf4; color: #166534; border: 1px solid #86efac; }
+        .tag-year { background: #faf5ff; color: #7e22ce; border: 1px solid #d8b4fe; }
         .tag-editor { display: flex; flex-direction: column; gap: 0.5rem; }
         .tag-editor label { font-size: 0.8rem; color: #646464; margin-bottom: 2px; display: block; }
         .tag-editor select, .tag-editor input[type="text"] {
@@ -524,12 +523,9 @@
                         </select>
                     </div>
                     <div>
-                        <label style="font-size:0.85rem;color:#646464;display:block;margin-bottom:4px;">Status</label>
-                        <select id="filterTagStatus" style="width:100%;padding:0.6rem;border:1px solid #e5e7eb;border-radius:6px;font-size:0.9rem;background:#fff;">
-                            <option value="">All statuses</option>
-                            <option value="unpaid">Unpaid</option>
-                            <option value="paid">Paid</option>
-                            <option value="archived">Archived</option>
+                        <label style="font-size:0.85rem;color:#646464;display:block;margin-bottom:4px;">Tag year</label>
+                        <select id="filterTagYear" style="width:100%;padding:0.6rem;border:1px solid #e5e7eb;border-radius:6px;font-size:0.9rem;background:#fff;">
+                            <option value="">All years</option>
                         </select>
                     </div>
                     <div style="display:flex; align-items:center;">
@@ -587,7 +583,19 @@
     </div>
 
     <script>
-        pdfjsLib.GlobalWorkerOptions.workerSrc = '/static/pdf.worker.min.js';
+        // Initialize pdf.js worker via blob URL for WKWebView compatibility
+        const _pdfjsInit = fetch('/static/pdf.worker.min.js')
+            .then(r => { if (!r.ok) throw new Error('worker fetch ' + r.status); return r.blob(); })
+            .then(blob => { pdfjsLib.GlobalWorkerOptions.workerSrc = URL.createObjectURL(blob); })
+            .catch(() => { pdfjsLib.GlobalWorkerOptions.workerSrc = '/static/pdf.worker.min.js'; });
+
+        // Populate year dropdowns (2030 → 2000)
+        (function() {
+            const opts = Array.from({length: 31}, (_, i) => 2030 - i)
+                .map(y => `<option value="${y}">${y}</option>`).join('');
+            const el = document.getElementById('filterTagYear');
+            if (el) el.insertAdjacentHTML('beforeend', opts);
+        })();
 
         // sidebar toggle
         function toggleSidebar() {
@@ -627,9 +635,9 @@
             const filterDate = document.getElementById('filterDate').value.trim();
             const filterAmount = document.getElementById('filterAmount').value.trim();
             const tagType = document.getElementById('filterTagType').value;
-            const tagStatus = document.getElementById('filterTagStatus').value;
+            const tagYear = document.getElementById('filterTagYear').value;
 
-            if (!q && !filterCompany && !filterDate && !filterAmount && !tagType && !tagStatus) return;
+            if (!q && !filterCompany && !filterDate && !filterAmount && !tagType && !tagYear) return;
 
             const container = document.getElementById('results');
             const header = document.getElementById('resultsHeader');
@@ -643,7 +651,7 @@
                 if (filterDate) queryStr += `&date=${encodeURIComponent(filterDate)}`;
                 if (filterAmount) queryStr += `&amount=${encodeURIComponent(filterAmount)}`;
                 if (tagType) queryStr += `&tag_type=${encodeURIComponent(tagType)}`;
-                if (tagStatus) queryStr += `&tag_status=${encodeURIComponent(tagStatus)}`;
+                if (tagYear) queryStr += `&tag_year=${encodeURIComponent(tagYear)}`;
                 const orMode = document.getElementById('filterModeOr').checked;
                 if (orMode) {
                     queryStr += `&mode=or`;
@@ -672,9 +680,9 @@
                     const snippet = (doc.snippet || '').substring(0, 120).replace(/\n/g, ' ');
                     const tags = doc.tags || {};
                     const typeBadge = tags.type ? `<span class="tag-badge tag-type">${escapeHtml(tags.type)}</span>` : '';
-                    const statusClass = tags.status ? `tag-status-${tags.status}` : '';
-                    const statusBadge = tags.status ? `<span class="tag-badge ${statusClass}">${escapeHtml(tags.status)}</span>` : '';
-                    const badgesHtml = (typeBadge || statusBadge) ? `<div class="tag-badges">${typeBadge}${statusBadge}</div>` : '';
+                    const companyBadge = tags.company ? `<span class="tag-badge tag-company">${escapeHtml(tags.company)}</span>` : '';
+                    const yearBadge = tags.year ? `<span class="tag-badge tag-year">${escapeHtml(tags.year)}</span>` : '';
+                    const badgesHtml = (typeBadge || companyBadge || yearBadge) ? `<div class="tag-badges">${typeBadge}${companyBadge}${yearBadge}</div>` : '';
 
                     div.innerHTML = `
                         <div class="result-top">
@@ -705,6 +713,7 @@
         
         async function renderPdfThumbnail(pdfPath, container) {
             try {
+                await _pdfjsInit;
                 const pdf = await pdfjsLib.getDocument(`/pdf/${encodeURIComponent(pdfPath)}`).promise;
                 const page = await pdf.getPage(1);
                 
@@ -742,7 +751,7 @@
             document.getElementById('filterDate').value = '';
             document.getElementById('filterAmount').value = '';
             document.getElementById('filterTagType').value = '';
-            document.getElementById('filterTagStatus').value = '';
+            document.getElementById('filterTagYear').value = '';
             document.getElementById('filterModeOr').checked = false;
             document.getElementById('results').innerHTML = '';
             document.getElementById('resultsHeader').style.display = 'none';
@@ -837,9 +846,10 @@
             modal.classList.add('show');
             
             try {
+                await _pdfjsInit;
                 const pdf = await pdfjsLib.getDocument(`/pdf/${encodeURIComponent(path)}`).promise;
                 const page = await pdf.getPage(1);
-                
+
                 const canvas = document.getElementById('pdfCanvas');
                 const context = canvas.getContext('2d');
                 const viewport = page.getViewport({ scale: 1.5 });
@@ -912,6 +922,9 @@
                 }
 
                 // Labels / tag editor
+                const yearOpts = '<option value="">— select —</option>' +
+                    Array.from({length: 31}, (_, i) => 2030 - i)
+                        .map(y => `<option value="${y}">${y}</option>`).join('');
                 html += `
                 <hr style="border:none;border-top:1px solid #e5e7eb;margin:1rem 0;">
                 <div class="summary-section">
@@ -930,21 +943,12 @@
                             </select>
                         </div>
                         <div>
-                            <label>Status</label>
-                            <select id="tagStatus">
-                                <option value="">— select —</option>
-                                <option value="unpaid">Unpaid</option>
-                                <option value="paid">Paid</option>
-                                <option value="archived">Archived</option>
-                            </select>
-                        </div>
-                        <div>
                             <label>Company</label>
                             <input type="text" id="tagCompany" placeholder="e.g., Spark NZ" />
                         </div>
                         <div>
                             <label>Year</label>
-                            <input type="text" id="tagYear" placeholder="e.g., 2024" maxlength="4" />
+                            <select id="tagYear">${yearOpts}</select>
                         </div>
                         <div style="display:flex;align-items:center;gap:0.5rem;">
                             <button class="tag-save-btn" onclick="saveTags()">Save labels</button>
@@ -957,9 +961,8 @@
 
                 // Populate tag fields after innerHTML is set
                 if (tags.type) document.getElementById('tagType').value = tags.type;
-                if (tags.status) document.getElementById('tagStatus').value = tags.status;
                 document.getElementById('tagCompany').value = tags.company || '';
-                document.getElementById('tagYear').value = tags.year || '';
+                if (tags.year) document.getElementById('tagYear').value = tags.year;
 
             } catch (err) {
                 panel.innerHTML = `<div style="color: #9ca3af;">Could not load summary</div>`;
@@ -971,9 +974,8 @@
             if (!path) return;
             const data = {
                 type: document.getElementById('tagType').value,
-                status: document.getElementById('tagStatus').value,
                 company: document.getElementById('tagCompany').value.trim(),
-                year: document.getElementById('tagYear').value.trim(),
+                year: document.getElementById('tagYear').value,
             };
             try {
                 const resp = await fetch(`/tags/${encodeURIComponent(path)}`, {

@@ -76,10 +76,10 @@ def search():
 
     # Tag filters (applied post-search)
     tag_type = request.args.get("tag_type", "").lower()
-    tag_status = request.args.get("tag_status", "").lower()
+    tag_year = request.args.get("tag_year", "")
 
     has_query = bool(q or filter_company or filter_date or filter_amount)
-    has_tag_filters = bool(tag_type or tag_status)
+    has_tag_filters = bool(tag_type or tag_year)
 
     if not has_query and not has_tag_filters:
         return jsonify([])
@@ -95,7 +95,7 @@ def search():
         for rel_path, tag in tags_data.items():
             if tag_type and tag.get("type", "").lower() != tag_type:
                 continue
-            if tag_status and tag.get("status", "").lower() != tag_status:
+            if tag_year and tag.get("year", "") != tag_year:
                 continue
             doc = doc_index.get(rel_path)
             if not doc:
@@ -146,7 +146,7 @@ def search():
             t = r.get("tags", {})
             if tag_type and t.get("type", "").lower() != tag_type:
                 continue
-            if tag_status and t.get("status", "").lower() != tag_status:
+            if tag_year and t.get("year", "") != tag_year:
                 continue
             filtered.append(r)
         results = filtered
@@ -248,7 +248,7 @@ def get_doc_tags(filename):
                            or extract_company_from_filename(fname)
                            or "")
                 tag = {
-                    "type": "", "status": "",
+                    "type": "",
                     "company": company,
                     "year": year,
                     "auto": True,
@@ -264,7 +264,6 @@ def save_doc_tags(filename):
     tags_data = load_tags()
     tags_data[filename] = {
         "type": data.get("type", ""),
-        "status": data.get("status", ""),
         "company": data.get("company", ""),
         "year": str(data.get("year", "")),
     }
