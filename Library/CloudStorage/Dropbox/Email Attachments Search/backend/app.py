@@ -1,7 +1,7 @@
 import os
 import json
 from urllib.parse import unquote
-from flask import Flask, render_template, request, send_from_directory, jsonify
+from flask import Flask, render_template, request, send_from_directory, send_file, jsonify
 from dotenv import load_dotenv
 
 # load .env
@@ -340,11 +340,29 @@ def text_search(q, filter_company="", filter_date="", filter_amount="", filter_m
 @app.route("/pdf/<path:filename>")
 def serve_pdf(filename):
     """Serve PDF files from the configured PDF folder (inline, not download)."""
-    try:
-        filename = unquote(filename)
-        return send_from_directory(PDF_FOLDER, filename, as_attachment=False)
-    except Exception as e:
-        return jsonify({"error": f"File not found: {e}"}), 404
+    filename = unquote(filename)
+    if not PDF_FOLDER:
+        return jsonify({"error": "PDF_FOLDER not configured — check .env"}), 503
+    filepath = os.path.join(PDF_FOLDER, filename)
+    if not os.path.isfile(filepath):
+        return jsonify({"error": f"File not found: {filepath}"}), 404
+    return send_file(filepath, mimetype="application/pdf")
+
+
+@app.route("/debug")
+def debug_info():
+    """Diagnostic endpoint — returns server-side config for troubleshooting."""
+    import glob as _glob
+    sample = []
+    if PDF_FOLDER and os.path.isdir(PDF_FOLDER):
+        sample = [os.path.basename(p) for p in _glob.glob(os.path.join(PDF_FOLDER, "*.pdf"))[:3]]
+    return jsonify({
+        "PDF_FOLDER": PDF_FOLDER,
+        "PDF_FOLDER_exists": os.path.isdir(PDF_FOLDER) if PDF_FOLDER else False,
+        "sample_files": sample,
+        "cwd": os.getcwd(),
+        "index_docs": len(documents),
+    })
 
 @app.route("/summary/<path:filename>")
 def get_summary(filename):

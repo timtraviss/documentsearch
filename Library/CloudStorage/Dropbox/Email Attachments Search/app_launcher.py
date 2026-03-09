@@ -20,6 +20,15 @@ else:
     backend_dir = app_dir / 'backend'
     os.chdir(app_dir)
 
+# Explicitly load .env from the app_dir before importing Flask app.
+# load_dotenv() inside app.py uses a file-relative search which can fail
+# in py2app bundles, so we guarantee it here with an absolute path.
+try:
+    from dotenv import load_dotenv as _load_env
+    _load_env(app_dir / '.env', override=False)
+except Exception as _e:
+    print(f"Warning: could not pre-load .env: {_e}")
+
 # Add backend to path
 sys.path.insert(0, str(backend_dir.parent))
 
