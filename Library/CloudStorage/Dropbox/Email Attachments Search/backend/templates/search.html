@@ -424,6 +424,32 @@
             font-weight: 500;
         }
         
+        .tag-badges { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 4px; }
+        .tag-badge {
+            display: inline-block; padding: 2px 7px; border-radius: 4px;
+            font-size: 0.72rem; font-weight: 500;
+        }
+        .tag-type { background: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; }
+        .tag-status-unpaid { background: #fff7ed; color: #c2410c; border: 1px solid #fed7aa; }
+        .tag-status-paid { background: #f0fdf4; color: #15803d; border: 1px solid #bbf7d0; }
+        .tag-status-archived { background: #f3f4f6; color: #6b7280; border: 1px solid #e5e7eb; }
+        .tag-editor { display: flex; flex-direction: column; gap: 0.5rem; }
+        .tag-editor label { font-size: 0.8rem; color: #646464; margin-bottom: 2px; display: block; }
+        .tag-editor select, .tag-editor input[type="text"] {
+            width: 100%; padding: 0.45rem 0.6rem; border: 1px solid #e5e7eb;
+            border-radius: 6px; font-size: 0.85rem; background: #ffffff;
+        }
+        .tag-editor select:focus, .tag-editor input[type="text"]:focus {
+            outline: none; border-color: #9ca3af;
+        }
+        .tag-save-btn {
+            padding: 0.45rem 0.9rem; background: #0d0d0d; color: white;
+            border: none; border-radius: 6px; cursor: pointer;
+            font-size: 0.85rem; font-weight: 500; margin-top: 0.25rem; align-self: flex-start;
+        }
+        .tag-save-btn:hover { background: #1a1a1a; }
+        .tag-saved-msg { font-size: 0.8rem; color: #15803d; margin-left: 8px; }
+
         @media (max-width: 1024px) {
             .modal-body {
                 flex-direction: column;
@@ -484,6 +510,27 @@
                     <div>
                         <label style="font-size:0.85rem;color:#646464;display:block;margin-bottom:4px;">Amount (min-max)</label>
                         <input id="filterAmount" type="text" placeholder="e.g., 1000-5000" style="width:100%;padding:0.6rem;border:1px solid #e5e7eb;border-radius:6px;font-size:0.9rem;" />
+                    </div>
+                    <div>
+                        <label style="font-size:0.85rem;color:#646464;display:block;margin-bottom:4px;">Document type</label>
+                        <select id="filterTagType" style="width:100%;padding:0.6rem;border:1px solid #e5e7eb;border-radius:6px;font-size:0.9rem;background:#fff;">
+                            <option value="">All types</option>
+                            <option value="invoice">Invoice</option>
+                            <option value="receipt">Receipt</option>
+                            <option value="contract">Contract</option>
+                            <option value="quote">Quote</option>
+                            <option value="statement">Statement</option>
+                            <option value="other">Other</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label style="font-size:0.85rem;color:#646464;display:block;margin-bottom:4px;">Status</label>
+                        <select id="filterTagStatus" style="width:100%;padding:0.6rem;border:1px solid #e5e7eb;border-radius:6px;font-size:0.9rem;background:#fff;">
+                            <option value="">All statuses</option>
+                            <option value="unpaid">Unpaid</option>
+                            <option value="paid">Paid</option>
+                            <option value="archived">Archived</option>
+                        </select>
                     </div>
                     <div style="display:flex; align-items:center;">
                         <input type="checkbox" id="filterModeOr" />
@@ -580,20 +627,24 @@
             const filterCompany = document.getElementById('filterCompany').value.trim();
             const filterDate = document.getElementById('filterDate').value.trim();
             const filterAmount = document.getElementById('filterAmount').value.trim();
-            
-            if (!q && !filterCompany && !filterDate && !filterAmount) return;
-            
+            const tagType = document.getElementById('filterTagType').value;
+            const tagStatus = document.getElementById('filterTagStatus').value;
+
+            if (!q && !filterCompany && !filterDate && !filterAmount && !tagType && !tagStatus) return;
+
             const container = document.getElementById('results');
             const header = document.getElementById('resultsHeader');
             container.innerHTML = '<div class="loading">Searching...</div>';
             header.style.display = 'none';
-            
+
             try {
                 // Build query string with filters and mode
                 let queryStr = `/search?q=${encodeURIComponent(q)}`;
                 if (filterCompany) queryStr += `&company=${encodeURIComponent(filterCompany)}`;
                 if (filterDate) queryStr += `&date=${encodeURIComponent(filterDate)}`;
                 if (filterAmount) queryStr += `&amount=${encodeURIComponent(filterAmount)}`;
+                if (tagType) queryStr += `&tag_type=${encodeURIComponent(tagType)}`;
+                if (tagStatus) queryStr += `&tag_status=${encodeURIComponent(tagStatus)}`;
                 const orMode = document.getElementById('filterModeOr').checked;
                 if (orMode) {
                     queryStr += `&mode=or`;
@@ -620,14 +671,20 @@
                     const filename = doc.filename || 'Unknown';
                     const path = doc.path || '';
                     const snippet = (doc.snippet || '').substring(0, 120).replace(/\n/g, ' ');
-                    
+                    const tags = doc.tags || {};
+                    const typeBadge = tags.type ? `<span class="tag-badge tag-type">${escapeHtml(tags.type)}</span>` : '';
+                    const statusClass = tags.status ? `tag-status-${tags.status}` : '';
+                    const statusBadge = tags.status ? `<span class="tag-badge ${statusClass}">${escapeHtml(tags.status)}</span>` : '';
+                    const badgesHtml = (typeBadge || statusBadge) ? `<div class="tag-badges">${typeBadge}${statusBadge}</div>` : '';
+
                     div.innerHTML = `
                         <div class="result-top">
                             <div class="result-thumbnail">
                                 <div class="loading">Loading...</div>
                             </div>
                             <div class="result-content">
-                                <div class="result-title">${filename}</div>
+                                <div class="result-title">${escapeHtml(filename)}</div>
+                                ${badgesHtml}
                                 <div class="result-snippet">${snippet}</div>
                             </div>
                         </div>
@@ -685,6 +742,8 @@
             document.getElementById('filterCompany').value = '';
             document.getElementById('filterDate').value = '';
             document.getElementById('filterAmount').value = '';
+            document.getElementById('filterTagType').value = '';
+            document.getElementById('filterTagStatus').value = '';
             document.getElementById('filterModeOr').checked = false;
             document.getElementById('results').innerHTML = '';
             document.getElementById('resultsHeader').style.display = 'none';
@@ -800,66 +859,125 @@
             loadSummary(path);
         }
         
+        let currentModalPath = '';
+
         async function loadSummary(path) {
+            currentModalPath = path;
             const panel = document.getElementById('summaryPanel');
             try {
-                const resp = await fetch(`/summary/${encodeURIComponent(path)}`);
-                const data = await resp.json();
-                
-                if (data.error) {
-                    panel.innerHTML = `<div style="color: #9ca3af;">No summary available</div>`;
-                    return;
-                }
-                
+                const [summaryResp, tagsResp] = await Promise.all([
+                    fetch(`/summary/${encodeURIComponent(path)}`),
+                    fetch(`/tags/${encodeURIComponent(path)}`)
+                ]);
+                const data = await summaryResp.json();
+                const tags = tagsResp.ok ? await tagsResp.json() : {};
+
                 let html = '';
-                
-                // Company
-                if (data.company) {
-                    html += `
-                        <div class="summary-section">
+
+                if (!data.error) {
+                    if (data.company) {
+                        html += `<div class="summary-section">
                             <h3>Company</h3>
-                            <div class="summary-value" style="font-size: 1rem; font-weight: 500;">${escapeHtml(data.company)}</div>
-                        </div>
-                    `;
-                }
-                
-                // Date
-                if (data.date) {
-                    html += `
-                        <div class="summary-section">
+                            <div class="summary-value" style="font-size:1rem;font-weight:500;">${escapeHtml(data.company)}</div>
+                        </div>`;
+                    }
+                    if (data.date) {
+                        html += `<div class="summary-section">
                             <h3>Date</h3>
                             <div class="summary-value">${escapeHtml(data.date)}</div>
-                        </div>
-                    `;
-                }
-                
-                // Amount
-                if (data.amount) {
-                    html += `
-                        <div class="summary-section">
+                        </div>`;
+                    }
+                    if (data.amount) {
+                        html += `<div class="summary-section">
                             <h3>Amount</h3>
-                            <div class="summary-value" style="font-size: 1.2rem; font-weight: 600; color: #0d0d0d;">${escapeHtml(data.amount)}</div>
-                        </div>
-                    `;
-                }
-                
-                // Invoice Number
-                if (data.invoice_number) {
-                    html += `
-                        <div class="summary-section">
+                            <div class="summary-value" style="font-size:1.2rem;font-weight:600;">${escapeHtml(data.amount)}</div>
+                        </div>`;
+                    }
+                    if (data.invoice_number) {
+                        html += `<div class="summary-section">
                             <h3>Invoice #</h3>
                             <div class="summary-value">${escapeHtml(data.invoice_number)}</div>
+                        </div>`;
+                    }
+                }
+
+                // Labels / tag editor
+                html += `
+                <hr style="border:none;border-top:1px solid #e5e7eb;margin:1rem 0;">
+                <div class="summary-section">
+                    <h3>Labels</h3>
+                    <div class="tag-editor">
+                        <div>
+                            <label>Document type</label>
+                            <select id="tagType">
+                                <option value="">— select —</option>
+                                <option value="invoice">Invoice</option>
+                                <option value="receipt">Receipt</option>
+                                <option value="contract">Contract</option>
+                                <option value="quote">Quote</option>
+                                <option value="statement">Statement</option>
+                                <option value="other">Other</option>
+                            </select>
                         </div>
-                    `;
-                }
-                
-                if (!data.company && !data.date && !data.amount && !data.invoice_number) {
-                    html = '<div style="color: #9ca3af; text-align: center; padding: 1rem;">No structured data found</div>';
-                }
-                
+                        <div>
+                            <label>Status</label>
+                            <select id="tagStatus">
+                                <option value="">— select —</option>
+                                <option value="unpaid">Unpaid</option>
+                                <option value="paid">Paid</option>
+                                <option value="archived">Archived</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label>Company</label>
+                            <input type="text" id="tagCompany" placeholder="e.g., Spark NZ" />
+                        </div>
+                        <div>
+                            <label>Year</label>
+                            <input type="text" id="tagYear" placeholder="e.g., 2024" maxlength="4" />
+                        </div>
+                        <div style="display:flex;align-items:center;gap:0.5rem;">
+                            <button class="tag-save-btn" onclick="saveTags()">Save labels</button>
+                            <span class="tag-saved-msg" id="tagSavedMsg">✓ Saved</span>
+                        </div>
+                    </div>
+                </div>`;
+
                 panel.innerHTML = html;
+
+                // Populate tag fields after innerHTML is set
+                if (tags.type) document.getElementById('tagType').value = tags.type;
+                if (tags.status) document.getElementById('tagStatus').value = tags.status;
+                document.getElementById('tagCompany').value = tags.company || '';
+                document.getElementById('tagYear').value = tags.year || '';
+
             } catch (err) {
                 panel.innerHTML = `<div style="color: #9ca3af;">Could not load summary</div>`;
+            }
+        }
+
+        async function saveTags() {
+            const path = currentModalPath;
+            if (!path) return;
+            const data = {
+                type: document.getElementById('tagType').value,
+                status: document.getElementById('tagStatus').value,
+                company: document.getElementById('tagCompany').value.trim(),
+                year: document.getElementById('tagYear').value.trim(),
+            };
+            try {
+                const resp = await fetch(`/tags/${encodeURIComponent(path)}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+                if (resp.ok) {
+                    const msg = document.getElementById('tagSavedMsg');
+                    msg.style.display = 'inline';
+                    setTimeout(() => msg.style.display = 'none', 2000);
+                }
+            } catch (err) {
+                console.error('Save tags error:', err);
             }
         }
         

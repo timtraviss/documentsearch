@@ -31,6 +31,18 @@ REINDEX_TOKEN = os.getenv("REINDEX_TOKEN")
 # simple versioning for display in the UI
 APP_VERSION = "0.1"
 
+# Tags storage (user-applied metadata: type, status, company, year)
+TAGS_FILE = os.path.join(os.path.dirname(__file__), "tags.json")
+
+def load_tags():
+    try:
+        if os.path.exists(TAGS_FILE):
+            with open(TAGS_FILE, "r", encoding="utf-8") as f:
+                return json.load(f)
+    except Exception:
+        pass
+    return {}
+
 # Status/logs for a running reindex job (simple in-memory structure)
 reindex_status = {
     "running": False,
@@ -54,32 +66,87 @@ def home():
 def search():
     q = request.args.get("q", "").lower()
     search_type = request.args.get("type", "semantic" if HAS_EMBEDDINGS else "text")
-    
-    # Optional filters from query params
+
+    # Existing text filters
     filter_company = request.args.get("company", "").lower()
     filter_date = request.args.get("date", "")
     filter_amount = request.args.get("amount", "")
-    filter_mode = request.args.get("mode", "and").lower()  # "and" or "or"
-    
+    filter_mode = request.args.get("mode", "and").lower()
+
+    # Tag filters (applied post-search)
+    tag_type = request.args.get("tag_type", "").lower()
+    tag_status = request.args.get("tag_status", "").lower()
+
+    has_query = bool(q or filter_company or filter_date or filter_amount)
+    has_tag_filters = bool(tag_type or tag_status)
+
+    if not has_query and not has_tag_filters:
+        return jsonify([])
+
+    tags_data = load_tags()
+    # O(1) doc lookup by relative_path
+    doc_index = {doc.get("relative_path", ""): doc for doc in documents}
+
     results = []
-    
-    if not q and not filter_company and not filter_date and not filter_amount:
-        return jsonify(results)
-    
+
+    # Tag-only browse: no text query, iterate tags directly
+    if not has_query and has_tag_filters:
+        for rel_path, tag in tags_data.items():
+            if tag_type and tag.get("type", "").lower() != tag_type:
+                continue
+            if tag_status and tag.get("status", "").lower() != tag_status:
+                continue
+            doc = doc_index.get(rel_path)
+            if not doc:
+                continue
+            text = doc.get("text", "")
+            results.append({
+                "filename": doc["filename"],
+                "path": rel_path,
+                "snippet": text[:300],
+                "company": tag.get("company") or extract_company(text) or "",
+                "date": tag.get("year") or extract_date(text) or "",
+                "amount": extract_total_amount(text) or "",
+                "tags": tag,
+            })
+        return jsonify(results[:20])
+
+    # Normal search (with or without tag filters)
     if search_type == "semantic" and HAS_EMBEDDINGS:
         try:
-            # Use AI-powered semantic search
-            search_results = semantic_search(q, top_k=10)
+            top_k = 50 if has_tag_filters else 10
+            search_results = semantic_search(q, top_k=top_k)
+            # Enrich semantic results with extracted metadata
+            for r in search_results:
+                doc = doc_index.get(r.get("path", ""), {})
+                text = doc.get("text", "") if doc else ""
+                r["company"] = extract_company(text) or ""
+                r["date"] = extract_date(text) or ""
+                r["amount"] = extract_total_amount(text) or ""
             results = search_results
         except Exception as e:
             print(f"Semantic search error: {e}")
-            # Fall back to text search with filters
             results = text_search(q, filter_company, filter_date, filter_amount, filter_mode)
     else:
-        # Text search with filters
         results = text_search(q, filter_company, filter_date, filter_amount, filter_mode)
-    
-    return jsonify(results)
+
+    # Enrich results with tag data
+    for r in results:
+        r["tags"] = tags_data.get(r.get("path", ""), {})
+
+    # Apply tag filters if set
+    if has_tag_filters:
+        filtered = []
+        for r in results:
+            t = r.get("tags", {})
+            if tag_type and t.get("type", "").lower() != tag_type:
+                continue
+            if tag_status and t.get("status", "").lower() != tag_status:
+                continue
+            filtered.append(r)
+        results = filtered
+
+    return jsonify(results[:20])
 
 
 @app.route("/reindex", methods=["POST"])
@@ -159,6 +226,43 @@ def reindex_status_api():
         'count': reindex_status.get('count', 0),
         'error': reindex_status.get('error')
     })
+
+@app.route("/tags/<path:filename>", methods=["GET"])
+def get_doc_tags(filename):
+    """Return saved tags for a document, auto-populated from extraction if not yet set."""
+    tags_data = load_tags()
+    tag = tags_data.get(filename, {})
+    if not tag:
+        for doc in documents:
+            if doc.get("relative_path") == filename or doc.get("path", "").endswith(filename):
+                text = doc.get("text", "")
+                date = extract_date(text) or ""
+                year = date[:4] if date else ""
+                tag = {
+                    "type": "", "status": "",
+                    "company": extract_company(text) or "",
+                    "year": year,
+                    "auto": True,
+                }
+                break
+    return jsonify(tag)
+
+
+@app.route("/tags/<path:filename>", methods=["POST"])
+def save_doc_tags(filename):
+    """Save user-applied tags for a document."""
+    data = request.get_json(force=True) or {}
+    tags_data = load_tags()
+    tags_data[filename] = {
+        "type": data.get("type", ""),
+        "status": data.get("status", ""),
+        "company": data.get("company", ""),
+        "year": str(data.get("year", "")),
+    }
+    with open(TAGS_FILE, "w", encoding="utf-8") as f:
+        json.dump(tags_data, f, indent=2)
+    return jsonify({"status": "ok"})
+
 
 def text_search(q, filter_company="", filter_date="", filter_amount="", filter_mode="and"):
     """Search by keyword and optional filters.
