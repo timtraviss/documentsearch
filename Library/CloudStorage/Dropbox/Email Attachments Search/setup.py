@@ -11,6 +11,7 @@ from setuptools import setup
 # Build options for py2app
 OPTIONS = {
     'argv_emulation': False,
+    'iconfile': 'app_icon.icns',
     'packages': [
         # backend package itself, plus some dependencies that py2app
         # occasionally misses (especially those containing compiled
@@ -28,6 +29,7 @@ OPTIONS = {
         'jinja2',
         'charset_normalizer',
         'cffi',
+        'webview',
     ],
     'includes': [
         'backend.app',

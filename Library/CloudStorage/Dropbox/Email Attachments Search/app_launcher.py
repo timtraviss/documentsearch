@@ -1,11 +1,10 @@
 #!/usr/bin/env python3
 """
 Launcher script for Document Search macOS app.
-Starts the Flask server and opens it in the default browser.
+Starts the Flask server and opens it in a native pywebview window.
 """
 import os
 import sys
-import webbrowser
 import time
 from pathlib import Path
 
@@ -71,21 +70,33 @@ def launch():
             daemon=True
         )
         server_thread.start()
-        
+
         # Give the server a moment to start
-        time.sleep(2)
-        
-        # Open in default browser
-        webbrowser.open(f'http://127.0.0.1:{port}')
-        print("Opened Document Search in your browser.")
-        
-        # Keep the thread alive
+        time.sleep(1.5)
+
+        # Ensure the app appears in the Dock as a regular foreground application.
+        # pywebview on macOS can start without a Dock icon unless activation policy
+        # is explicitly set to Regular.
         try:
-            while True:
-                time.sleep(1)
-        except KeyboardInterrupt:
-            print("\nShutting down Document Search...")
-            sys.exit(0)
+            import AppKit
+            ns_app = AppKit.NSApplication.sharedApplication()
+            ns_app.setActivationPolicy_(AppKit.NSApplicationActivationPolicyRegular)
+            ns_app.activateIgnoringOtherApps_(True)
+        except Exception:
+            pass
+
+        # Open in a native window via pywebview (must run on main thread)
+        import webview
+        window = webview.create_window(
+            'Document Search',
+            f'http://127.0.0.1:{port}',
+            width=1280,
+            height=860,
+            min_size=(800, 600),
+        )
+        webview.start()
+        print("Document Search window closed. Shutting down...")
+        sys.exit(0)
     except Exception as exc:
         # write crash info to a log next to the resources
         try:
