@@ -346,7 +346,10 @@ def serve_pdf(filename):
     filepath = os.path.join(PDF_FOLDER, filename)
     if not os.path.isfile(filepath):
         return jsonify({"error": f"File not found: {filepath}"}), 404
-    return send_file(filepath, mimetype="application/pdf")
+    try:
+        return send_file(filepath, mimetype="application/pdf")
+    except Exception as e:
+        return jsonify({"error": f"send_file failed: {e}", "filepath": filepath}), 500
 
 
 @app.route("/debug")

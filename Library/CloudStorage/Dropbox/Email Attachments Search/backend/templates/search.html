@@ -589,6 +589,11 @@
             .then(blob => { pdfjsLib.GlobalWorkerOptions.workerSrc = URL.createObjectURL(blob); })
             .catch(() => { pdfjsLib.GlobalWorkerOptions.workerSrc = '/static/pdf.worker.min.js'; });
 
+        // Encode a file path for use in a URL, preserving directory slashes
+        function encodePdfPath(p) {
+            return p.split('/').map(encodeURIComponent).join('/');
+        }
+
         // Populate year dropdowns (2030 → 2000)
         (function() {
             const opts = Array.from({length: 31}, (_, i) => 2030 - i)
@@ -714,7 +719,7 @@
         async function renderPdfThumbnail(pdfPath, container) {
             try {
                 await _pdfjsInit;
-                const pdf = await pdfjsLib.getDocument(`/pdf/${encodeURIComponent(pdfPath)}`).promise;
+                const pdf = await pdfjsLib.getDocument(`/pdf/${encodePdfPath(pdfPath)}`).promise;
                 const page = await pdf.getPage(1);
                 
                 const canvas = document.createElement('canvas');
@@ -847,7 +852,7 @@
             
             try {
                 await _pdfjsInit;
-                const pdf = await pdfjsLib.getDocument(`/pdf/${encodeURIComponent(path)}`).promise;
+                const pdf = await pdfjsLib.getDocument(`/pdf/${encodePdfPath(path)}`).promise;
                 const page = await pdf.getPage(1);
 
                 const canvas = document.getElementById('pdfCanvas');
@@ -882,11 +887,11 @@
             // Fetch summary and tags independently so one failure doesn't block the other
             let data = {}, tags = {};
             try {
-                const resp = await fetch(`/summary/${encodeURIComponent(path)}`);
+                const resp = await fetch(`/summary/${encodePdfPath(path)}`);
                 if (resp.ok) data = await resp.json();
             } catch(e) { console.error('Summary fetch error:', e); }
             try {
-                const resp = await fetch(`/tags/${encodeURIComponent(path)}`);
+                const resp = await fetch(`/tags/${encodePdfPath(path)}`);
                 if (resp.ok) tags = await resp.json();
             } catch(e) { console.error('Tags fetch error:', e); }
 
@@ -978,7 +983,7 @@
                 year: document.getElementById('tagYear').value,
             };
             try {
-                const resp = await fetch(`/tags/${encodeURIComponent(path)}`, {
+                const resp = await fetch(`/tags/${encodePdfPath(path)}`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(data)
@@ -1011,7 +1016,7 @@
         
         function downloadPdf(path) {
             const link = document.createElement('a');
-            link.href = `/pdf/${encodeURIComponent(path)}`;
+            link.href = `/pdf/${encodePdfPath(path)}`;
             link.download = path.split('/').pop();
             link.click();
         }
