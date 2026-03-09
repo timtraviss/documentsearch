@@ -1,0 +1,18 @@
+#!/bin/bash
+# Sync source changes into the existing app bundle without a full rebuild.
+# Run this after editing backend/app.py or backend/templates/*.html
+
+set -e
+
+BUNDLE="dist/Document Search.app/Contents/Resources/lib/python3.12/backend"
+SRC="backend"
+
+echo "Syncing source → bundle..."
+
+cp "$SRC/app.py"                  "$BUNDLE/app.py"
+cp "$SRC/templates/search.html"   "$BUNDLE/templates/search.html"
+
+# Clear cached bytecode so Python picks up the new source
+rm -f "$BUNDLE/__pycache__/app"*.pyc
+
+echo "Done. Relaunch the app to see changes."
