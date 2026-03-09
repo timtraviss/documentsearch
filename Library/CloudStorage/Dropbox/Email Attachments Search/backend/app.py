@@ -1,5 +1,6 @@
 import os
 import json
+from urllib.parse import unquote
 from flask import Flask, render_template, request, send_from_directory, jsonify
 from dotenv import load_dotenv
 
@@ -341,6 +342,7 @@ def text_search(q, filter_company="", filter_date="", filter_amount="", filter_m
 def serve_pdf(filename):
     """Serve PDF files from the configured PDF folder (inline, not download)."""
     try:
+        filename = unquote(filename)
         return send_from_directory(PDF_FOLDER, filename, as_attachment=False)
     except Exception as e:
         return jsonify({"error": f"File not found: {e}"}), 404
