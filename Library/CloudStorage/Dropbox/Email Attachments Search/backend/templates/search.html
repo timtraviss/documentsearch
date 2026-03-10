@@ -1014,12 +1014,6 @@
                             <div class="summary-value">${escapeHtml(data.date)}</div>
                         </div>`;
                     }
-                    if (data.amount) {
-                        html += `<div class="summary-section">
-                            <h3>Amount</h3>
-                            <div class="summary-value" style="font-size:1.2rem;font-weight:600;">${escapeHtml(data.amount)}</div>
-                        </div>`;
-                    }
                 }
 
                 // Labels / tag editor
@@ -1053,6 +1047,10 @@
                             <select id="tagYear">${yearOpts}</select>
                         </div>
                         <div>
+                            <label>Amount</label>
+                            <input type="text" id="tagAmount" placeholder="e.g., $123.45" autocomplete="off" />
+                        </div>
+                        <div>
                             <label>Invoice number</label>
                             <input type="text" id="tagInvoiceNumber" placeholder="e.g., INV-1234" autocomplete="off" />
                         </div>
@@ -1069,7 +1067,7 @@
                 if (tags.type) document.getElementById('tagType').value = tags.type;
                 document.getElementById('tagCompany').value = tags.company || '';
                 if (tags.year) document.getElementById('tagYear').value = tags.year;
-                // Invoice number: prefer saved tag, fall back to auto-extracted value
+                document.getElementById('tagAmount').value = tags.amount || data.amount || '';
                 document.getElementById('tagInvoiceNumber').value = tags.invoice_number || data.invoice_number || '';
 
             } catch (err) {
@@ -1084,6 +1082,7 @@
                 type: document.getElementById('tagType').value,
                 company: document.getElementById('tagCompany').value.trim(),
                 year: document.getElementById('tagYear').value,
+                amount: document.getElementById('tagAmount').value.trim(),
                 invoice_number: document.getElementById('tagInvoiceNumber').value.trim(),
             };
             try {

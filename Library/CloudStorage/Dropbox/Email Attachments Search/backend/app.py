@@ -266,6 +266,7 @@ def save_doc_tags(filename):
         "type": data.get("type", ""),
         "company": data.get("company", ""),
         "year": str(data.get("year", "")),
+        "amount": data.get("amount", ""),
         "invoice_number": data.get("invoice_number", ""),
     }
     with open(TAGS_FILE, "w", encoding="utf-8") as f:
