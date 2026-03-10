@@ -353,6 +353,12 @@ def serve_pdf(filename):
                         headers={'Content-Disposition': 'inline'})
     except FileNotFoundError:
         return jsonify({"error": f"File not found: {filepath}"}), 404
+    except PermissionError:
+        return jsonify({
+            "error": "permission_denied",
+            "message": "macOS has blocked access to this file. Grant Full Disk Access to Document Search in System Settings → Privacy & Security → Full Disk Access.",
+            "filepath": filepath
+        }), 403
     except Exception as e:
         # Log the real exception to a file next to the index for diagnosis
         try:

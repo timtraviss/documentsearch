@@ -756,7 +756,11 @@
                 container.innerHTML = '';
                 container.appendChild(canvas);
             } catch (err) {
-                container.innerHTML = `<div style="color: #9ca3af; font-size: 0.75rem; padding: 4px; word-break:break-all;">Preview unavailable<br><small>${err.message || err}</small></div>`;
+                const msg = err.message || err.toString();
+                const isPermission = msg.includes('403') || msg.toLowerCase().includes('permission');
+                container.innerHTML = isPermission
+                    ? `<div style="color:#9ca3af;font-size:0.7rem;padding:4px;line-height:1.4;">Preview blocked<br><small>Grant <b>Full Disk Access</b> to Document Search in<br>System Settings → Privacy &amp; Security</small></div>`
+                    : `<div style="color:#9ca3af;font-size:0.75rem;padding:4px;word-break:break-all;">Preview unavailable<br><small>${msg}</small></div>`;
             }
         }
 
@@ -889,8 +893,16 @@
                 console.error('PDF rendering error:', err);
                 const canvas = document.getElementById('pdfCanvas');
                 const errDiv = document.createElement('div');
-                errDiv.style.cssText = 'color:#c2410c;padding:1rem;font-size:0.85rem;word-break:break-all;';
-                errDiv.textContent = 'PDF error: ' + (err.message || err.toString());
+                errDiv.style.cssText = 'color:#c2410c;padding:1.25rem;font-size:0.85rem;line-height:1.6;';
+                const msg = err.message || err.toString();
+                const isPermission = msg.includes('403') || msg.toLowerCase().includes('permission');
+                errDiv.innerHTML = isPermission
+                    ? '<b>macOS permission denied</b><br>The app cannot read your PDF files.<br><br>' +
+                      'To fix this:<br>' +
+                      '1. Open <b>System Settings → Privacy &amp; Security → Full Disk Access</b><br>' +
+                      '2. Click <b>+</b> and add <b>Document Search.app</b><br>' +
+                      '3. Quit and relaunch the app'
+                    : 'PDF error: ' + escapeHtml(msg);
                 if (canvas.parentNode) canvas.parentNode.insertBefore(errDiv, canvas);
             }
             

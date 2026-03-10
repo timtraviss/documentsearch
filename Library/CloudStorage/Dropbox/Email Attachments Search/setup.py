@@ -61,6 +61,9 @@ OPTIONS = {
         'CFBundleIdentifier': 'com.personal.documentsearch',
         'CFBundleVersion': '0.1.0',
         'CFBundleShortVersionString': '0.1',
+        'NSDesktopFolderUsageDescription': 'Document Search needs access to read PDF files from your folders.',
+        'NSDocumentsFolderUsageDescription': 'Document Search needs access to read PDF files from your folders.',
+        'NSDownloadsFolderUsageDescription': 'Document Search needs access to read PDF files from your folders.',
     },
 }
 
