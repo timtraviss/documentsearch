@@ -347,9 +347,24 @@ def serve_pdf(filename):
     if not os.path.isfile(filepath):
         return jsonify({"error": f"File not found: {filepath}"}), 404
     try:
-        return send_file(filepath, mimetype="application/pdf")
+        return send_from_directory(
+            os.path.dirname(filepath),
+            os.path.basename(filepath),
+            as_attachment=False
+        )
     except Exception as e:
-        return jsonify({"error": f"send_file failed: {e}", "filepath": filepath}), 500
+        return jsonify({"error": f"serve failed: {e}", "filepath": filepath}), 500
+
+
+@app.route("/stats")
+def stats():
+    """Return index document count and last-indexed timestamp."""
+    from datetime import datetime
+    last_indexed = None
+    if os.path.exists(INDEX_FILE):
+        mtime = os.path.getmtime(INDEX_FILE)
+        last_indexed = datetime.fromtimestamp(mtime).strftime("%-d %b %Y, %H:%M")
+    return jsonify({"doc_count": len(documents), "last_indexed": last_indexed})
 
 
 @app.route("/debug")

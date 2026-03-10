@@ -482,9 +482,15 @@
         </ul>
     </div>
     <div class="container">
-        <div class="header">
-            <h1>Document Search</h1>
-            <p class="subtitle">Find documents from your email attachments</p>
+        <div class="header" style="display:flex; justify-content:space-between; align-items:flex-start;">
+            <div>
+                <h1>Document Search</h1>
+                <p class="subtitle">Find documents from your email attachments</p>
+            </div>
+            <div id="indexStats" style="text-align:right; font-size:0.8rem; color:#9ca3af; line-height:1.6; margin-top:0.3rem;">
+                <div id="statsDocCount"></div>
+                <div id="statsLastIndexed"></div>
+            </div>
         </div>
         
 <div class="search-section">
@@ -600,6 +606,19 @@
                 .map(y => `<option value="${y}">${y}</option>`).join('');
             const el = document.getElementById('filterTagYear');
             if (el) el.insertAdjacentHTML('beforeend', opts);
+        })();
+
+        // Load and display index stats in header
+        (async function loadStats() {
+            try {
+                const resp = await fetch('/stats');
+                if (!resp.ok) return;
+                const s = await resp.json();
+                if (s.doc_count != null)
+                    document.getElementById('statsDocCount').textContent = `${s.doc_count} documents`;
+                if (s.last_indexed)
+                    document.getElementById('statsLastIndexed').textContent = `Indexed ${s.last_indexed}`;
+            } catch(e) {}
         })();
 
         // sidebar toggle
