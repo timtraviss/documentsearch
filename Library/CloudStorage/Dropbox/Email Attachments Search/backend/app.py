@@ -340,20 +340,30 @@ def text_search(q, filter_company="", filter_date="", filter_amount="", filter_m
 @app.route("/pdf/<path:filename>")
 def serve_pdf(filename):
     """Serve PDF files from the configured PDF folder (inline, not download)."""
+    from flask import Response
+    import traceback
     filename = unquote(filename)
     if not PDF_FOLDER:
         return jsonify({"error": "PDF_FOLDER not configured — check .env"}), 503
     filepath = os.path.join(PDF_FOLDER, filename)
-    if not os.path.isfile(filepath):
-        return jsonify({"error": f"File not found: {filepath}"}), 404
     try:
-        return send_from_directory(
-            os.path.dirname(filepath),
-            os.path.basename(filepath),
-            as_attachment=False
-        )
+        with open(filepath, 'rb') as f:
+            data = f.read()
+        return Response(data, mimetype='application/pdf',
+                        headers={'Content-Disposition': 'inline'})
+    except FileNotFoundError:
+        return jsonify({"error": f"File not found: {filepath}"}), 404
     except Exception as e:
-        return jsonify({"error": f"serve failed: {e}", "filepath": filepath}), 500
+        # Log the real exception to a file next to the index for diagnosis
+        try:
+            log = os.path.join(os.path.dirname(__file__), 'pdf_error.log')
+            with open(log, 'a') as lf:
+                lf.write(f"path={filepath}\nexc={type(e).__name__}: {e}\n")
+                traceback.print_exc(file=lf)
+                lf.write("---\n")
+        except Exception:
+            pass
+        return jsonify({"error": str(e), "type": type(e).__name__, "filepath": filepath}), 500
 
 
 @app.route("/stats")
