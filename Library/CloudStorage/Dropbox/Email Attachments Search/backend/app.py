@@ -372,6 +372,18 @@ def serve_pdf(filename):
         return jsonify({"error": str(e), "type": type(e).__name__, "filepath": filepath}), 500
 
 
+@app.route("/companies")
+def get_companies():
+    """Return sorted list of unique company names from saved tags."""
+    tags_data = load_tags()
+    companies = sorted({
+        tag.get("company", "").strip()
+        for tag in tags_data.values()
+        if tag.get("company", "").strip()
+    })
+    return jsonify(companies)
+
+
 @app.route("/stats")
 def stats():
     """Return index document count and last-indexed timestamp."""

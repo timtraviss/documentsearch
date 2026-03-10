@@ -353,6 +353,36 @@
             background: white;
             border-radius: 6px;
         }
+
+        .pdf-page-controls {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 1rem;
+            padding: 0.5rem 1rem;
+            background: #f9fafb;
+            border-bottom: 1px solid #e5e7eb;
+            font-size: 0.85rem;
+            color: #374151;
+        }
+        .pdf-page-controls button {
+            padding: 0.3rem 0.75rem;
+            background: #fff;
+            border: 1px solid #d1d5db;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.85rem;
+            font-weight: 500;
+        }
+        .pdf-page-controls button:hover:not(:disabled) { background: #f3f4f6; }
+        .pdf-page-controls button:disabled { opacity: 0.35; cursor: default; }
+
+        mark {
+            background: #fef08a;
+            color: inherit;
+            border-radius: 2px;
+            padding: 0 1px;
+        }
         
         .summary-panel {
             flex: 1;
@@ -555,6 +585,11 @@
             </div>
             <div class="modal-body">
                 <div class="pdf-viewer">
+                    <div class="pdf-page-controls" id="pdfPageControls" style="display:none">
+                        <button id="pdfPrevBtn" onclick="changePdfPage(-1)" disabled>&#8592; Prev</button>
+                        <span id="pdfPageInfo">Page 1 of 1</span>
+                        <button id="pdfNextBtn" onclick="changePdfPage(1)" disabled>Next &#8594;</button>
+                    </div>
                     <div class="pdf-canvas-container">
                         <canvas id="pdfCanvas"></canvas>
                     </div>
@@ -607,6 +642,19 @@
             const el = document.getElementById('filterTagYear');
             if (el) el.insertAdjacentHTML('beforeend', opts);
         })();
+
+        // Populate company autocomplete datalist from saved tags
+        async function loadCompanyList() {
+            try {
+                const resp = await fetch('/companies');
+                if (!resp.ok) return;
+                const companies = await resp.json();
+                const dl = document.getElementById('companyList');
+                if (!dl) return;
+                dl.innerHTML = companies.map(c => `<option value="${escapeHtml(c)}">`).join('');
+            } catch(e) {}
+        }
+        loadCompanyList();
 
         // Load and display index stats in header
         (async function loadStats() {
@@ -701,7 +749,8 @@
                     
                     const filename = doc.filename || 'Unknown';
                     const path = doc.path || '';
-                    const snippet = (doc.snippet || '').substring(0, 120).replace(/\n/g, ' ');
+                    const rawSnippet = (doc.snippet || '').substring(0, 120).replace(/\n/g, ' ');
+                    const snippet = highlightText(rawSnippet, document.getElementById('q').value);
                     const tags = doc.tags || {};
                     const typeBadge = tags.type ? `<span class="tag-badge tag-type">${escapeHtml(tags.type)}</span>` : '';
                     const companyBadge = tags.company ? `<span class="tag-badge tag-company">${escapeHtml(tags.company)}</span>` : '';
@@ -716,7 +765,7 @@
                             <div class="result-content">
                                 <div class="result-title">${escapeHtml(filename)}</div>
                                 ${badgesHtml}
-                                <div class="result-snippet">${snippet}</div>
+                                <div class="result-snippet" style="white-space:normal;">${snippet}</div>
                             </div>
                         </div>
                         <div class="result-actions">
@@ -868,31 +917,31 @@
             }
         };
         
+        let _pdfDoc = null;
+        let _pdfPage = 1;
+
         async function viewPdf(path, filename) {
             const modal = document.getElementById('pdfModal');
             document.getElementById('modalTitle').textContent = filename;
             modal.classList.add('show');
-            
+
+            // Reset state
+            _pdfDoc = null;
+            _pdfPage = 1;
+            document.getElementById('pdfPageControls').style.display = 'none';
+            // Clear any previous error messages
+            document.querySelectorAll('.pdf-err-msg').forEach(el => el.remove());
+
             try {
                 await _pdfjsInit;
-                const pdf = await pdfjsLib.getDocument(`/pdf/${encodePdfPath(path)}`).promise;
-                const page = await pdf.getPage(1);
-
-                const canvas = document.getElementById('pdfCanvas');
-                const context = canvas.getContext('2d');
-                const viewport = page.getViewport({ scale: 1.5 });
-                
-                canvas.width = viewport.width;
-                canvas.height = viewport.height;
-                
-                await page.render({
-                    canvasContext: context,
-                    viewport: viewport
-                }).promise;
+                _pdfDoc = await pdfjsLib.getDocument(`/pdf/${encodePdfPath(path)}`).promise;
+                document.getElementById('pdfPageControls').style.display = 'flex';
+                await renderPdfPage(1);
             } catch (err) {
                 console.error('PDF rendering error:', err);
                 const canvas = document.getElementById('pdfCanvas');
                 const errDiv = document.createElement('div');
+                errDiv.className = 'pdf-err-msg';
                 errDiv.style.cssText = 'color:#c2410c;padding:1.25rem;font-size:0.85rem;line-height:1.6;';
                 const msg = err.message || err.toString();
                 const isPermission = msg.includes('403') || msg.toLowerCase().includes('permission');
@@ -905,8 +954,30 @@
                     : 'PDF error: ' + escapeHtml(msg);
                 if (canvas.parentNode) canvas.parentNode.insertBefore(errDiv, canvas);
             }
-            
+
             loadSummary(path);
+        }
+
+        async function renderPdfPage(pageNum) {
+            if (!_pdfDoc) return;
+            _pdfPage = pageNum;
+            const page = await _pdfDoc.getPage(pageNum);
+            const canvas = document.getElementById('pdfCanvas');
+            const context = canvas.getContext('2d');
+            const viewport = page.getViewport({ scale: 1.5 });
+            canvas.width = viewport.width;
+            canvas.height = viewport.height;
+            await page.render({ canvasContext: context, viewport }).promise;
+            document.getElementById('pdfPageInfo').textContent = `Page ${pageNum} of ${_pdfDoc.numPages}`;
+            document.getElementById('pdfPrevBtn').disabled = pageNum <= 1;
+            document.getElementById('pdfNextBtn').disabled = pageNum >= _pdfDoc.numPages;
+        }
+
+        function changePdfPage(delta) {
+            if (!_pdfDoc) return;
+            const next = _pdfPage + delta;
+            if (next < 1 || next > _pdfDoc.numPages) return;
+            renderPdfPage(next);
         }
         
         let currentModalPath = '';
@@ -980,7 +1051,8 @@
                         </div>
                         <div>
                             <label>Company</label>
-                            <input type="text" id="tagCompany" placeholder="e.g., Spark NZ" />
+                            <input type="text" id="tagCompany" placeholder="e.g., Spark NZ" list="companyList" autocomplete="off" />
+                            <datalist id="companyList"></datalist>
                         </div>
                         <div>
                             <label>Year</label>
@@ -1023,12 +1095,25 @@
                     const msg = document.getElementById('tagSavedMsg');
                     msg.style.display = 'inline';
                     setTimeout(() => msg.style.display = 'none', 2000);
+                    loadCompanyList();
                 }
             } catch (err) {
                 console.error('Save tags error:', err);
             }
         }
         
+        function highlightText(rawText, query) {
+            const escaped = escapeHtml(rawText);
+            if (!query) return escaped;
+            const tokens = query.toLowerCase().split(/\s+/).filter(t => t.length > 1);
+            if (!tokens.length) return escaped;
+            const pattern = new RegExp(
+                '(' + tokens.map(t => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|') + ')',
+                'gi'
+            );
+            return escaped.replace(pattern, '<mark>$1</mark>');
+        }
+
         function escapeHtml(text) {
             const map = {
                 '&': '&amp;',
@@ -1043,6 +1128,10 @@
         function closePdfModal() {
             const modal = document.getElementById('pdfModal');
             modal.classList.remove('show');
+            _pdfDoc = null;
+            _pdfPage = 1;
+            document.getElementById('pdfPageControls').style.display = 'none';
+            document.querySelectorAll('.pdf-err-msg').forEach(el => el.remove());
         }
         
         function downloadPdf(path) {

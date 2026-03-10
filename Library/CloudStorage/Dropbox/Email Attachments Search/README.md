@@ -1,3 +1,4 @@
+
 # Email Attachments Search
 
 An AI-powered web application to search and quickly locate PDF invoices in your `Email Attachments` folder. The app provides both keyword-based and semantic AI search, with direct links and previews.
@@ -231,6 +232,37 @@ python backend/embeddings.py  # if using AI search
 - **Vector Search**: FAISS (Facebook AI Similarity Search)
 - **AI Embeddings**: OpenAI API
 - **Frontend**: HTML5 + Vanilla JavaScript
+
+## Roadmap
+
+### In progress / recently completed
+- [x] PDF thumbnail previews on result cards
+- [x] Multi-page PDF viewer with Prev/Next navigation
+- [x] Search term highlighting in result snippets
+- [x] Company autocomplete in tag editor (populated from existing tags)
+- [x] Tag system: Type, Company, Year badges on result cards
+- [x] Document count and last-indexed date in header
+- [x] Re-index with live progress log
+
+### Planned improvements
+
+#### Search quality
+- [ ] Sort results — by date (newest/oldest), company, year, or relevance
+- [ ] Untagged filter — quick toggle to show only documents with no tags
+- [ ] Increase results limit beyond 20 (pagination or "load more")
+
+#### Tagging workflow
+- [ ] Auto-suggest tags — pre-fill company and year from extracted document text when opening a new document
+- [ ] Bulk tagging — select multiple results with checkboxes and apply tags to all at once
+- [ ] Tag management page — rename or merge tags across all documents
+
+#### Performance
+- [ ] Incremental re-indexing — only process new/changed files (compare mtimes against index)
+- [ ] Background indexing — don't block the UI while indexing runs
+
+#### Export / reporting
+- [ ] CSV export — export current search results with tags to a spreadsheet
+- [ ] Stats dashboard — breakdown of documents by company, type, and year
 
 ## License
 
