@@ -1020,12 +1020,6 @@
                             <div class="summary-value" style="font-size:1.2rem;font-weight:600;">${escapeHtml(data.amount)}</div>
                         </div>`;
                     }
-                    if (data.invoice_number) {
-                        html += `<div class="summary-section">
-                            <h3>Invoice #</h3>
-                            <div class="summary-value">${escapeHtml(data.invoice_number)}</div>
-                        </div>`;
-                    }
                 }
 
                 // Labels / tag editor
@@ -1058,6 +1052,10 @@
                             <label>Year</label>
                             <select id="tagYear">${yearOpts}</select>
                         </div>
+                        <div>
+                            <label>Invoice number</label>
+                            <input type="text" id="tagInvoiceNumber" placeholder="e.g., INV-1234" autocomplete="off" />
+                        </div>
                         <div style="display:flex;align-items:center;gap:0.5rem;">
                             <button class="tag-save-btn" onclick="saveTags()">Save labels</button>
                             <span class="tag-saved-msg" id="tagSavedMsg">✓ Saved</span>
@@ -1071,6 +1069,8 @@
                 if (tags.type) document.getElementById('tagType').value = tags.type;
                 document.getElementById('tagCompany').value = tags.company || '';
                 if (tags.year) document.getElementById('tagYear').value = tags.year;
+                // Invoice number: prefer saved tag, fall back to auto-extracted value
+                document.getElementById('tagInvoiceNumber').value = tags.invoice_number || data.invoice_number || '';
 
             } catch (err) {
                 panel.innerHTML = `<div style="color: #9ca3af;">Could not load summary</div>`;
@@ -1084,6 +1084,7 @@
                 type: document.getElementById('tagType').value,
                 company: document.getElementById('tagCompany').value.trim(),
                 year: document.getElementById('tagYear').value,
+                invoice_number: document.getElementById('tagInvoiceNumber').value.trim(),
             };
             try {
                 const resp = await fetch(`/tags/${encodePdfPath(path)}`, {
