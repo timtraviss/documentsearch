@@ -257,8 +257,8 @@ python backend/embeddings.py  # if using AI search
 - [x] Tag management page — rename or merge tags across all documents
 
 #### Performance
-- [ ] Incremental re-indexing — only process new/changed files (compare mtimes against index)
-- [ ] Background indexing — don't block the UI while indexing runs
+- [x] Incremental re-indexing — only process new/changed files (compare mtimes against index)
+- [x] Background indexing — don't block the UI while indexing runs
 
 #### Export / reporting
 - [ ] CSV export — export current search results with tags to a spreadsheet

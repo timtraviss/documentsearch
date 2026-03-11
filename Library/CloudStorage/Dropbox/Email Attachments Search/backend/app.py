@@ -32,8 +32,18 @@ REINDEX_TOKEN = os.getenv("REINDEX_TOKEN")
 # simple versioning for display in the UI
 APP_VERSION = "0.1"
 
-# Tags storage (user-applied metadata: type, status, company, year)
-TAGS_FILE = os.path.join(os.path.dirname(__file__), "tags.json")
+# Tags storage — kept in ~/Library/Application Support so rebuilding the .app
+# bundle never wipes user-saved tags.
+_APP_SUPPORT = os.path.expanduser("~/Library/Application Support/Document Search")
+os.makedirs(_APP_SUPPORT, exist_ok=True)
+TAGS_FILE = os.path.join(_APP_SUPPORT, "tags.json")
+
+# Migration: if an old tags.json exists next to this file (from a previous
+# version or from running via the bundle), move it to the new location.
+_OLD_TAGS = os.path.join(os.path.dirname(__file__), "tags.json")
+if os.path.exists(_OLD_TAGS) and not os.path.exists(TAGS_FILE):
+    import shutil
+    shutil.move(_OLD_TAGS, TAGS_FILE)
 
 def load_tags():
     try:
@@ -49,6 +59,7 @@ reindex_status = {
     "running": False,
     "logs": [],
     "count": 0,
+    "skipped": 0,
     "error": None,
 }
 
@@ -200,20 +211,25 @@ def reindex():
     if reindex_status["running"]:
         return jsonify({"status": "error", "error": "reindex already running"}), 409
 
+    body = request.get_json(silent=True) or {}
+    incremental = bool(body.get("incremental", False))
+
     # Start background worker so UI can poll status
     import threading
 
     def _log(msg):
         reindex_status["logs"].append(msg)
 
-    def worker():
+    def worker(incremental=incremental):
         try:
             reindex_status["running"] = True
             reindex_status["logs"] = []
             reindex_status["count"] = 0
+            reindex_status["skipped"] = 0
             reindex_status["error"] = None
 
-            _log("Starting reindex...")
+            mode = "incremental" if incremental else "full"
+            _log(f"Starting {mode} reindex...")
 
             # use package-qualified import to work regardless of cwd
             from backend.indexer import scan_pdfs, save_index
@@ -226,11 +242,18 @@ def reindex():
 
             _log(f"Scanning folder: {folder}")
 
-            def progress_cb(path, idx, total):
-                _log(f"Indexed ({idx}/{total}): {path.split('/')[-1]}")
+            existing = documents if incremental else None
 
-            docs = scan_pdfs(folder, progress_callback=progress_cb)
-            _log(f"Saving index ({len(docs)} documents)")
+            def progress_cb(path, idx, total, skipped=False):
+                name = path.split('/')[-1]
+                if skipped:
+                    reindex_status["skipped"] += 1
+                    _log(f"Unchanged ({idx}/{total}): {name}")
+                else:
+                    _log(f"Indexed ({idx}/{total}): {name}")
+
+            docs = scan_pdfs(folder, progress_callback=progress_cb, existing_index=existing)
+            _log(f"Saving index ({len(docs)} documents, {reindex_status['skipped']} unchanged)")
             save_index(docs)
 
             # update in-memory documents
@@ -248,7 +271,7 @@ def reindex():
     t = threading.Thread(target=worker, daemon=True)
     t.start()
 
-    return jsonify({"status": "ok", "message": "reindex started"})
+    return jsonify({"status": "ok", "message": "reindex started", "incremental": incremental})
 
 
 @app.route('/reindex/status')
@@ -259,6 +282,7 @@ def reindex_status_api():
         'running': reindex_status.get('running', False),
         'logs': logs,
         'count': reindex_status.get('count', 0),
+        'skipped': reindex_status.get('skipped', 0),
         'error': reindex_status.get('error')
     })
 

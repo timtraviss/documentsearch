@@ -516,6 +516,7 @@
         }
         .bulk-toolbar input[type="text"] { width: 140px; }
         .bulk-toolbar select { width: 110px; }
+        @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.5} }
         .bulk-apply-btn {
             background: #3b82f6; color: white; border: none;
             border-radius: 5px; padding: 0.4rem 1rem;
@@ -579,6 +580,7 @@
                 <button id="clearBtn" type="button" class="search-btn">Clear</button>
                 <button id="advancedToggle" type="button" class="search-btn">⚙️ Filters</button>
                 <button id="reindexBtn" type="button" class="search-btn">Re-index PDFs</button>
+                <span id="reindexBadge" style="display:none; font-size:0.78rem; color:#6366f1; background:#ede9fe; padding:2px 8px; border-radius:12px; vertical-align:middle; animation:pulse 1.5s infinite;">⟳ Indexing…</span>
                 <button id="tagMgmtBtn" type="button" class="search-btn">Manage tags</button>
             </form>
                         <!-- Advanced filters (hidden by default) -->
@@ -694,14 +696,18 @@
                 <button class="close-btn" onclick="closeReindexModal()">&times;</button>
             </div>
             <div style="padding:1.25rem;">
-                <p style="color:#0d0d0d; margin-bottom:0.75rem;">This will scan your `PDF_FOLDER`, extract text from each PDF, and overwrite the search index. This can take a few seconds to minutes depending on how many files you have.</p>
+                <p style="color:#0d0d0d; margin-bottom:0.75rem;">Scan your PDF folder and update the search index. Use <strong>Incremental</strong> to only process new or changed files — much faster when most files haven't changed.</p>
                 <div id="tokenRow" style="margin-bottom:0.75rem; display: none;">
                     <label style="font-size:0.9rem;color:#646464;display:block;margin-bottom:6px;">Re-index token (required)</label>
                     <input id="reindexTokenInput" type="password" placeholder="Enter token" style="width:100%; padding:0.6rem; border:1px solid #e5e7eb; border-radius:6px;" />
                 </div>
+                <label style="display:flex; align-items:center; gap:0.5rem; margin-bottom:0.75rem; font-size:0.9rem; color:#374151; cursor:pointer;">
+                    <input type="checkbox" id="incrementalCheck" checked style="width:15px;height:15px;cursor:pointer;" />
+                    Incremental (skip unchanged files)
+                </label>
                 <div style="display:flex; gap:0.5rem; align-items:center;">
                     <button id="confirmReindexBtn" class="btn-sm" style="background:#0d0d0d;color:#fff;">Start Re-index</button>
-                    <button class="btn-sm" onclick="closeReindexModal()">Cancel</button>
+                    <button class="btn-sm" id="dismissReindexBtn" onclick="closeReindexModal()">Cancel</button>
                 </div>
                 <div id="reindexLog" style="margin-top:1rem; max-height:220px; overflow:auto; background:#0f1724; color:#e6eef8; padding:0.75rem; border-radius:6px; font-family:monospace; font-size:0.85rem; display:none;"></div>
             </div>
@@ -1184,56 +1190,103 @@
             }
         }
 
+        // Global background poller — runs independently of the modal
+        let _reindexPolling = false;
+
+        function setReindexBadge(active) {
+            const badge = document.getElementById('reindexBadge');
+            if (badge) badge.style.display = active ? 'inline' : 'none';
+        }
+
+        async function startReindexPoller() {
+            if (_reindexPolling) return;
+            _reindexPolling = true;
+            setReindexBadge(true);
+            const logEl = document.getElementById('reindexLog');
+            let lastLogs = logEl ? parseInt(logEl.dataset.lastLogs || '0', 10) : 0;
+
+            while (true) {
+                const status = await pollReindexStatus();
+
+                // Append new log lines if modal log is visible
+                if (logEl && logEl.style.display !== 'none' && status.logs && status.logs.length > lastLogs) {
+                    for (let i = lastLogs; i < status.logs.length; i++) {
+                        logEl.textContent += status.logs[i] + '\n';
+                    }
+                    lastLogs = status.logs.length;
+                    if (logEl.dataset) logEl.dataset.lastLogs = lastLogs;
+                    logEl.scrollTop = logEl.scrollHeight;
+                }
+
+                if (!status.running) {
+                    setReindexBadge(false);
+                    _reindexPolling = false;
+                    const btn = document.getElementById('confirmReindexBtn');
+                    const dismissBtn = document.getElementById('dismissReindexBtn');
+                    if (btn) btn.disabled = false;
+                    if (dismissBtn) dismissBtn.textContent = 'Close';
+
+                    if (logEl && logEl.style.display !== 'none') {
+                        if (status.error) {
+                            logEl.textContent += 'Error: ' + status.error + '\n';
+                        } else {
+                            const skipped = status.skipped || 0;
+                            const indexed = (status.count || 0) - skipped;
+                            logEl.textContent += `Done. ${indexed} indexed, ${skipped} unchanged, ${status.count || 0} total.\n`;
+                        }
+                        logEl.scrollTop = logEl.scrollHeight;
+                    }
+                    // refresh stats in header
+                    loadStats();
+                    break;
+                }
+                await new Promise(r => setTimeout(r, 1000));
+            }
+        }
+
         document.getElementById('confirmReindexBtn').onclick = async () => {
             const btn = document.getElementById('confirmReindexBtn');
             btn.disabled = true;
+            const dismissBtn = document.getElementById('dismissReindexBtn');
+            if (dismissBtn) dismissBtn.textContent = 'Run in background';
             const token = document.getElementById('reindexTokenInput') ? document.getElementById('reindexTokenInput').value : null;
+            const incremental = document.getElementById('incrementalCheck') ? document.getElementById('incrementalCheck').checked : false;
 
-            // show log container
             const logEl = document.getElementById('reindexLog');
             logEl.style.display = 'block';
             logEl.textContent = '';
+            logEl.dataset.lastLogs = '0';
+
+            const headers = { 'Content-Type': 'application/json' };
+            if (token) headers['X-Reindex-Token'] = token;
 
             try {
-                const headers = {};
-                if (token) headers['X-Reindex-Token'] = token;
-
-                const resp = await fetch('/reindex', { method: 'POST', headers });
+                const resp = await fetch('/reindex', {
+                    method: 'POST',
+                    headers,
+                    body: JSON.stringify({ incremental })
+                });
                 const data = await resp.json();
                 if (!data || data.status !== 'ok') {
                     logEl.textContent += 'Failed to start reindex: ' + (data && data.error ? data.error : 'unknown') + '\n';
                     btn.disabled = false;
+                    if (dismissBtn) dismissBtn.textContent = 'Cancel';
                     return;
                 }
-
-                // poll until finished
-                let lastLogs = 0;
-                while (true) {
-                    const status = await pollReindexStatus();
-                    if (status.logs && status.logs.length > lastLogs) {
-                        for (let i = lastLogs; i < status.logs.length; i++) {
-                            logEl.textContent += status.logs[i] + '\n';
-                        }
-                        lastLogs = status.logs.length;
-                        logEl.scrollTop = logEl.scrollHeight;
-                    }
-
-                    if (!status.running) {
-                        if (status.error) {
-                            logEl.textContent += 'Error: ' + status.error + '\n';
-                        } else {
-                            logEl.textContent += 'Done. Indexed ' + (status.count || 0) + ' documents.\n';
-                        }
-                        break;
-                    }
-                    await new Promise(r => setTimeout(r, 1000));
-                }
+                // Background poller takes over — modal can now be dismissed
+                startReindexPoller();
             } catch (err) {
                 logEl.textContent += 'Request failed: ' + err.message + '\n';
-            } finally {
                 btn.disabled = false;
+                if (dismissBtn) dismissBtn.textContent = 'Cancel';
             }
         };
+
+        // On page load, resume badge if a reindex is already running (e.g. after page refresh)
+        (async () => {
+            const status = await pollReindexStatus();
+            if (status.running) startReindexPoller();
+        })();
         
         let _pdfDoc = null;
         let _pdfPage = 1;
