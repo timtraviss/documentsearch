@@ -582,6 +582,7 @@
                 <button id="reindexBtn" type="button" class="search-btn">Re-index PDFs</button>
                 <span id="reindexBadge" style="display:none; font-size:0.78rem; color:#6366f1; background:#ede9fe; padding:2px 8px; border-radius:12px; vertical-align:middle; animation:pulse 1.5s infinite;">⟳ Indexing…</span>
                 <button id="tagMgmtBtn" type="button" class="search-btn">Manage tags</button>
+                <button id="statsBtn" type="button" class="search-btn">Stats</button>
             </form>
                         <!-- Advanced filters (hidden by default) -->
             <div id="advancedFilters" style="display:none; margin-top:1rem; padding:1rem; background:#f9fafb; border-radius:6px; border:1px solid #e5e7eb;">
@@ -628,13 +629,16 @@
             </div>
         <div id="resultsHeader" class="results-header" style="display:none;">
             <span class="results-count" id="resultsCount"></span>
-            <select id="sortBy" style="padding:0.4rem 0.6rem;border:1px solid #e5e7eb;border-radius:6px;font-size:0.85rem;background:#fff;color:#374151;">
-                <option value="relevance">Sort: Relevance</option>
-                <option value="date_desc">Date: Newest first</option>
-                <option value="date_asc">Date: Oldest first</option>
-                <option value="company">Company A–Z</option>
-                <option value="year_desc">Year: Newest first</option>
-            </select>
+            <div style="display:flex;gap:0.5rem;align-items:center;">
+                <select id="sortBy" style="padding:0.4rem 0.6rem;border:1px solid #e5e7eb;border-radius:6px;font-size:0.85rem;background:#fff;color:#374151;">
+                    <option value="relevance">Sort: Relevance</option>
+                    <option value="date_desc">Date: Newest first</option>
+                    <option value="date_asc">Date: Oldest first</option>
+                    <option value="company">Company A–Z</option>
+                    <option value="year_desc">Year: Newest first</option>
+                </select>
+                <button id="exportCsvBtn" type="button" class="btn-sm" style="white-space:nowrap;">↓ Export CSV</button>
+            </div>
         </div>
         <div id="results" class="results-grid"></div>
         <div style="text-align:center; margin-top:1.25rem;">
@@ -710,6 +714,19 @@
                     <button class="btn-sm" id="dismissReindexBtn" onclick="closeReindexModal()">Cancel</button>
                 </div>
                 <div id="reindexLog" style="margin-top:1rem; max-height:220px; overflow:auto; background:#0f1724; color:#e6eef8; padding:0.75rem; border-radius:6px; font-family:monospace; font-size:0.85rem; display:none;"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Stats Modal -->
+    <div id="statsModal" class="modal">
+        <div class="modal-content" style="max-width:700px;height:auto;max-height:88vh;overflow-y:auto;">
+            <div class="modal-header">
+                <h2>Stats Dashboard</h2>
+                <button class="close-btn" onclick="closeStats()">&times;</button>
+            </div>
+            <div id="statsBody" style="padding:1.25rem;">
+                <div class="loading">Loading...</div>
             </div>
         </div>
     </div>
@@ -1101,6 +1118,94 @@
                 };
             });
         }
+
+        // ---- Stats dashboard ----
+        document.getElementById('statsBtn').onclick = openStats;
+
+        function closeStats() {
+            document.getElementById('statsModal').classList.remove('show');
+        }
+
+        async function openStats() {
+            document.getElementById('statsModal').classList.add('show');
+            const body = document.getElementById('statsBody');
+            body.innerHTML = '<div class="loading">Loading...</div>';
+            try {
+                const resp = await fetch('/stats/breakdown');
+                if (!resp.ok) throw new Error('failed');
+                renderStats(await resp.json());
+            } catch(e) {
+                body.innerHTML = '<div style="color:#9ca3af;padding:1rem;">Could not load stats.</div>';
+            }
+        }
+
+        function renderStats(data) {
+            const body = document.getElementById('statsBody');
+            const total = data.total_docs || 0;
+            const tagged = data.tagged_docs || 0;
+            const pct = total ? Math.round(tagged / total * 100) : 0;
+
+            function barSection(title, counts) {
+                const entries = Object.entries(counts);
+                if (!entries.length) return '';
+                const max = entries[0][1];
+                let rows = entries.map(([label, count]) => {
+                    const w = max ? Math.round(count / max * 100) : 0;
+                    return `<div style="display:flex;align-items:center;gap:0.6rem;margin-bottom:0.45rem;">
+                        <div style="width:130px;font-size:0.82rem;color:#374151;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex-shrink:0;" title="${escapeHtml(label)}">${escapeHtml(label)}</div>
+                        <div style="flex:1;background:#f3f4f6;border-radius:4px;height:14px;overflow:hidden;">
+                            <div style="width:${w}%;background:#6366f1;height:100%;border-radius:4px;transition:width 0.4s;"></div>
+                        </div>
+                        <div style="font-size:0.8rem;color:#9ca3af;width:28px;text-align:right;flex-shrink:0;">${count}</div>
+                    </div>`;
+                }).join('');
+                return `<div style="margin-bottom:1.75rem;">
+                    <h3 style="font-size:0.78rem;text-transform:uppercase;color:#646464;letter-spacing:0.5px;margin-bottom:0.75rem;">${title}</h3>
+                    ${rows}
+                </div>`;
+            }
+
+            body.innerHTML = `
+                <div style="display:flex;gap:1.5rem;margin-bottom:1.75rem;flex-wrap:wrap;">
+                    <div style="flex:1;min-width:120px;background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:1rem;text-align:center;">
+                        <div style="font-size:1.75rem;font-weight:700;color:#0d0d0d;">${total}</div>
+                        <div style="font-size:0.8rem;color:#9ca3af;margin-top:2px;">Total documents</div>
+                    </div>
+                    <div style="flex:1;min-width:120px;background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:1rem;text-align:center;">
+                        <div style="font-size:1.75rem;font-weight:700;color:#6366f1;">${tagged}</div>
+                        <div style="font-size:0.8rem;color:#9ca3af;margin-top:2px;">Tagged (${pct}%)</div>
+                    </div>
+                    <div style="flex:1;min-width:120px;background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:1rem;text-align:center;">
+                        <div style="font-size:1.75rem;font-weight:700;color:#10b981;">${total - tagged}</div>
+                        <div style="font-size:0.8rem;color:#9ca3af;margin-top:2px;">Untagged</div>
+                    </div>
+                </div>
+                ${barSection('By document type', data.by_type || {})}
+                ${barSection('By company', data.by_company || {})}
+                ${barSection('By year', data.by_year || {})}
+            `;
+        }
+
+        // ---- CSV export ----
+        document.getElementById('exportCsvBtn').onclick = () => {
+            const q = document.getElementById('q').value.trim();
+            const filterCompany = document.getElementById('filterCompany').value.trim();
+            const filterDate = document.getElementById('filterDate').value.trim();
+            const filterAmount = document.getElementById('filterAmount').value.trim();
+            const tagType = document.getElementById('filterTagType').value;
+            const tagYear = document.getElementById('filterTagYear').value;
+            const orMode = document.getElementById('filterModeOr').checked;
+            const untagged = document.getElementById('filterUntagged').checked;
+            let qs = `q=${encodeURIComponent(q)}`;
+            if (filterCompany) qs += `&company=${encodeURIComponent(filterCompany)}`;
+            if (filterDate) qs += `&date=${encodeURIComponent(filterDate)}`;
+            if (filterAmount) qs += `&amount=${encodeURIComponent(filterAmount)}`;
+            if (tagType) qs += `&tag_type=${encodeURIComponent(tagType)}`;
+            if (tagYear) qs += `&tag_year=${encodeURIComponent(tagYear)}`;
+            if (orMode) qs += `&mode=or`;
+            if (untagged) qs += `&tag_untagged=1`;
+            window.location.href = '/export/csv?' + qs;
+        };
 
         // Also wire tag mgmt modal close on backdrop click (add to window.onclick)
 
@@ -1523,6 +1628,10 @@
             const mgmtModal = document.getElementById('tagMgmtModal');
             if (event.target === mgmtModal) {
                 closeTagMgmt();
+            }
+            const statsModal = document.getElementById('statsModal');
+            if (event.target === statsModal) {
+                closeStats();
             }
         };
     </script>

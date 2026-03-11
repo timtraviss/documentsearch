@@ -511,6 +511,123 @@ def stats():
     return jsonify({"doc_count": len(documents), "last_indexed": last_indexed})
 
 
+@app.route("/stats/breakdown")
+def stats_breakdown():
+    """Return tag value counts grouped by type, company, and year."""
+    tags_data = load_tags()
+    by_type = {}
+    by_company = {}
+    by_year = {}
+    tagged = 0
+    for tag in tags_data.values():
+        has_any = False
+        t = tag.get("type", "").strip()
+        c = tag.get("company", "").strip()
+        y = tag.get("year", "").strip()
+        if t:
+            by_type[t] = by_type.get(t, 0) + 1
+            has_any = True
+        if c:
+            by_company[c] = by_company.get(c, 0) + 1
+            has_any = True
+        if y:
+            by_year[y] = by_year.get(y, 0) + 1
+            has_any = True
+        if has_any:
+            tagged += 1
+    # Sort by count descending
+    by_type = dict(sorted(by_type.items(), key=lambda x: -x[1]))
+    by_company = dict(sorted(by_company.items(), key=lambda x: -x[1]))
+    by_year = dict(sorted(by_year.items(), key=lambda x: -x[1]))
+    return jsonify({
+        "total_docs": len(documents),
+        "tagged_docs": tagged,
+        "by_type": by_type,
+        "by_company": by_company,
+        "by_year": by_year,
+    })
+
+
+@app.route("/export/csv")
+def export_csv():
+    """Export all matching search results (with tags) as a CSV file."""
+    import csv
+    import io
+
+    q = request.args.get("q", "").lower()
+    filter_company = request.args.get("company", "").lower()
+    filter_date = request.args.get("date", "")
+    filter_amount = request.args.get("amount", "")
+    filter_mode = request.args.get("mode", "and").lower()
+    tag_type = request.args.get("tag_type", "").lower()
+    tag_year = request.args.get("tag_year", "")
+    tag_untagged = request.args.get("tag_untagged", "").lower() in ("1", "true")
+
+    tags_data = load_tags()
+
+    has_query = bool(q or filter_company or filter_date or filter_amount)
+    has_tag_filters = bool(tag_type or tag_year or tag_untagged)
+
+    if has_query:
+        results = text_search(q, filter_company, filter_date, filter_amount, filter_mode)
+        for r in results:
+            r["tags"] = tags_data.get(r.get("path", ""), {})
+    else:
+        # No text query: pull from all documents (optionally filtered by tag)
+        doc_index = {doc.get("relative_path", ""): doc for doc in documents}
+        results = []
+        for rel_path, doc in doc_index.items():
+            fname = doc.get("filename", "")
+            text = doc.get("text", "")
+            tag = tags_data.get(rel_path, {})
+            results.append({
+                "filename": fname,
+                "path": rel_path,
+                "snippet": text[:300],
+                "company": tag.get("company") or extract_company(text) or extract_company_from_filename(fname) or "",
+                "date": tag.get("year") or extract_date(text) or "",
+                "amount": extract_total_amount(text) or "",
+                "tags": tag,
+            })
+
+    # Apply tag filters
+    if has_tag_filters:
+        filtered = []
+        for r in results:
+            t = r.get("tags", {})
+            if tag_type and t.get("type", "").lower() != tag_type:
+                continue
+            if tag_year and t.get("year", "") != tag_year:
+                continue
+            if tag_untagged and any(str(v).strip() for v in t.values()):
+                continue
+            filtered.append(r)
+        results = filtered
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["Filename", "Company", "Type", "Year", "Amount", "Invoice Number", "Path"])
+    for r in results:
+        tag = r.get("tags", {})
+        writer.writerow([
+            r.get("filename", ""),
+            tag.get("company") or r.get("company", ""),
+            tag.get("type", ""),
+            tag.get("year", "") or r.get("date", ""),
+            tag.get("amount") or r.get("amount", ""),
+            tag.get("invoice_number", ""),
+            r.get("path", ""),
+        ])
+
+    output.seek(0)
+    from flask import Response
+    return Response(
+        output.getvalue(),
+        mimetype="text/csv",
+        headers={"Content-Disposition": "attachment; filename=documents_export.csv"}
+    )
+
+
 @app.route("/debug")
 def debug_info():
     """Diagnostic endpoint — returns server-side config for troubleshooting."""

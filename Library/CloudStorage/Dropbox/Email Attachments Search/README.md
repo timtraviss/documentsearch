@@ -261,8 +261,8 @@ python backend/embeddings.py  # if using AI search
 - [x] Background indexing — don't block the UI while indexing runs
 
 #### Export / reporting
-- [ ] CSV export — export current search results with tags to a spreadsheet
-- [ ] Stats dashboard — breakdown of documents by company, type, and year
+- [x] CSV export — export current search results with tags to a spreadsheet
+- [x] Stats dashboard — breakdown of documents by company, type, and year
 
 ## License
 
