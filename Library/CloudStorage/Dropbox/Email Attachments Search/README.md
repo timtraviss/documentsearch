@@ -281,8 +281,83 @@ python backend/embeddings.py  # if using AI search
 - [ ] Search-as-you-type — debounced (~400ms) so results appear without pressing Enter
 - [ ] Keyboard shortcut — ⌘K focuses the search bar from anywhere in the app
 
-## License
+## Scale & Evernote Migration Roadmap
 
-Private project for personal use.
+The current architecture stores all document text in a flat `index.json` file loaded entirely into RAM, and searches via a linear scan. This works well up to ~500 PDFs but will become slow and memory-heavy beyond that.
+
+**Practical thresholds:**
+| Volume | Current app |
+|---|---|
+| ~500 PDFs | Works fine |
+| 1,000–3,000 PDFs | Slow startup, sluggish search |
+| 5,000+ PDFs | Memory pressure, search timeouts |
+
+### Storage layer
+- [x] Migrate `index.json` to SQLite — query documents on demand instead of loading all text into RAM at startup
+- [x] Migrate `tags.json` to a SQLite table — avoid full-file rewrites on every tag save
+- [x] Enable SQLite FTS5 full-text search — proper inverted index replaces the current linear scan (`for doc in documents`)
+
+### Evernote import
+- [ ] Write an `.enex` importer — Evernote exports XML (`.enex`), not PDFs; the current indexer only handles `.pdf` files
+- [ ] Preserve Evernote metadata — notebooks, note-level tags, created/modified dates are richer than the current type/company/year schema
+- [ ] Extend the tag schema to accommodate Evernote's notebook and tag hierarchy
+
+### Performance
+- [ ] Lazy-load document text — store snippets/metadata in memory; fetch full text from SQLite only when needed
+- [ ] Index in parallel — use a worker pool in `indexer.py` for large initial imports (thousands of documents)
+
+---
+
+## SQLite Migration Plan
+
+### Overview
+
+Replace `index.json` + `tags.json` with a single SQLite database (`backend/search.db`). The DB lives in the Dropbox project folder so it is automatically cloud-backed-up. The Flask API and frontend do not change.
+
+### Step 1 — `backend/database.py` *(new file)*
+- [x] Schema + connection helpers. Nothing else changes yet.
+- `documents` table with full `text` column + generated `snippet`
+- `documents_fts` FTS5 virtual table (`content=documents`, `tokenize="unicode61"`)
+- `tags` table replacing `tags.json`
+- Helper functions: `get_db_path()`, `get_connection()`, `init_db()`, `upsert_document()`, `delete_missing_documents()`, `fts_rebuild()`, `get_tag()`, `upsert_tag()`, `upsert_tags_bulk()`
+
+### Step 2 — `backend/migrate.py` *(new file)*
+- [x] One-time script, run by hand after Step 1.
+- Reads existing `index.json` → inserts all docs into DB
+- Reads existing `tags.json` → inserts all tags into DB
+- Calls `fts_rebuild()` once at end
+- Keeps JSON files intact as rollback option until Step 5
+
+### Step 3 — `backend/indexer.py`
+- [x] Add `save_index_to_db(conn, docs)` alongside the existing `save_index()` (JSON)
+- Mtime check moves from dict lookup to `SELECT mtime FROM documents WHERE relative_path = ?`
+- After full scan: call `delete_missing_documents()` to prune stale rows, then `fts_rebuild()`
+- Keep `save_index()` temporarily until Step 5
+
+### Step 4 — `backend/app.py` *(largest change)*
+- [x] Remove global `documents` list — all queries hit the DB via Flask `g`-based connection
+- [x] Replace `load_tags()` with per-request DB queries
+- [x] Replace `text_search()` linear scan with FTS5 `MATCH` query (with `highlight()` for snippets)
+- [x] Update all tag write routes (`save_doc_tags`, `bulk_tags`, `rename_tag`) to use `upsert_tag()`
+- [x] Update `stats()` and `debug_info()` to use `SELECT COUNT(*) FROM documents`
+- [x] Reindex background thread opens its own DB connection (cannot use Flask `g`)
+
+**Key gotchas:**
+- FTS5 + `INSERT OR REPLACE` orphans old FTS rows — use explicit `UPDATE`/`INSERT` for existing docs, not upsert
+- Flask threading: one connection per request via `g`; never use a module-level connection singleton
+- FTS5 `MATCH` raises `MatchError` on malformed queries — wrap in try/except and fall back to `LIKE`
+
+### Step 5 — Cleanup *(after Step 4 verified working)*
+- [x] Remove `INDEX_FILE`, `save_index()`, `TAGS_FILE`, `load_tags()` from `app.py` and `indexer.py`
+- [x] Delete `backend/index.json` (backup kept at `backend/index.json.bak`)
+- [x] Delete `tags.json` from Application Support (already in DB)
+- [x] Update `sync_bundle.sh` to copy `database.py` and clear its `.pyc` cache
+- [x] Add `backend.database` to `includes` in `setup.py`
+- [x] Fix py2app bundle: copy `sqlite3` stdlib package + `_sqlite3.so` extension into bundle (py2app omits both; `sync_bundle.sh` now handles this automatically)
+
+### Backup note
+The DB is stored in the Dropbox project folder (`backend/search.db`), giving automatic cloud backup and Dropbox version history. Tags were previously stored in `~/Library/Application Support/` with no backup.
+
+## License
 
 Private project for personal use.

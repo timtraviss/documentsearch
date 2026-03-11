@@ -1,60 +1,71 @@
 import os
+import re
+import csv
+import io
 import json
+import socket
+import threading
+import traceback
 from urllib.parse import unquote
-from flask import Flask, render_template, request, send_from_directory, send_file, jsonify
+from datetime import datetime
+
+from flask import Flask, Response, g, render_template, request, jsonify
 from dotenv import load_dotenv
 
-# load .env
 load_dotenv()
 
 PDF_FOLDER = os.getenv("PDF_FOLDER")
-INDEX_FILE = os.path.join(os.path.dirname(__file__), "index.json")
 
 app = Flask(__name__)
 
-# load index into memory
-if os.path.exists(INDEX_FILE):
-    with open(INDEX_FILE, "r", encoding="utf-8") as f:
-        documents = json.load(f)
-else:
-    documents = []
+# ---------------------------------------------------------------------------
+# Database — initialise schema on startup, one connection per request via g
+# ---------------------------------------------------------------------------
 
-# Try to load embeddings module for semantic search
+from backend.database import (
+    init_db,
+    get_connection as _get_connection,
+    get_db_path,
+    get_document_count,
+    upsert_tag,
+    get_tag,
+    get_all_tags,
+)
+
+init_db()
+_DB_PATH = get_db_path()
+
+
+def get_db():
+    """Return the per-request SQLite connection, opening it on first use."""
+    if "db" not in g:
+        g.db = _get_connection()
+    return g.db
+
+
+@app.teardown_appcontext
+def close_db(exc):
+    db = g.pop("db", None)
+    if db is not None:
+        db.close()
+
+
+# ---------------------------------------------------------------------------
+# Optional semantic search
+# ---------------------------------------------------------------------------
+
 try:
     from embeddings import search as semantic_search
-    HAS_EMBEDDINGS = os.path.exists(os.path.join(os.path.dirname(__file__), "vector.faiss"))
+    HAS_EMBEDDINGS = os.path.exists(
+        os.path.join(os.path.dirname(__file__), "vector.faiss")
+    )
 except ImportError:
     HAS_EMBEDDINGS = False
 
-# Optional secret token to protect the reindex endpoint for non-local deployments
 REINDEX_TOKEN = os.getenv("REINDEX_TOKEN")
-
-# simple versioning for display in the UI
 APP_VERSION = "0.1"
 
-# Tags storage — kept in ~/Library/Application Support so rebuilding the .app
-# bundle never wipes user-saved tags.
-_APP_SUPPORT = os.path.expanduser("~/Library/Application Support/Document Search")
-os.makedirs(_APP_SUPPORT, exist_ok=True)
-TAGS_FILE = os.path.join(_APP_SUPPORT, "tags.json")
-
-# Migration: if an old tags.json exists next to this file (from a previous
-# version or from running via the bundle), move it to the new location.
-_OLD_TAGS = os.path.join(os.path.dirname(__file__), "tags.json")
-if os.path.exists(_OLD_TAGS) and not os.path.exists(TAGS_FILE):
-    import shutil
-    shutil.move(_OLD_TAGS, TAGS_FILE)
-
-def load_tags():
-    try:
-        if os.path.exists(TAGS_FILE):
-            with open(TAGS_FILE, "r", encoding="utf-8") as f:
-                return json.load(f)
-    except Exception:
-        pass
-    return {}
-
-# Status/logs for a running reindex job (simple in-memory structure)
+# In-memory status for the background reindex thread
 reindex_status = {
     "running": False,
     "logs": [],
@@ -63,297 +74,71 @@ reindex_status = {
     "error": None,
 }
 
-import re
+# ---------------------------------------------------------------------------
+# Search helpers
+# ---------------------------------------------------------------------------
 
-@app.route("/")
-def home():
-    return render_template(
-        "search.html",
-        has_embeddings=HAS_EMBEDDINGS,
-        reindex_token_present=bool(REINDEX_TOKEN),
-        version=APP_VERSION
-    )
-
-@app.route("/search")
-def search():
-    q = request.args.get("q", "").lower()
-    search_type = request.args.get("type", "semantic" if HAS_EMBEDDINGS else "text")
-
-    # Existing text filters
-    filter_company = request.args.get("company", "").lower()
-    filter_date = request.args.get("date", "")
-    filter_amount = request.args.get("amount", "")
-    filter_mode = request.args.get("mode", "and").lower()
-
-    # Tag filters (applied post-search)
-    tag_type = request.args.get("tag_type", "").lower()
-    tag_year = request.args.get("tag_year", "")
-    tag_untagged = request.args.get("tag_untagged", "").lower() in ("1", "true")
-
-    # Pagination
-    try:
-        limit = min(max(int(request.args.get("limit", 20)), 1), 200)
-        offset = max(int(request.args.get("offset", 0)), 0)
-    except (ValueError, TypeError):
-        limit, offset = 20, 0
-
-    has_query = bool(q or filter_company or filter_date or filter_amount)
-    has_tag_filters = bool(tag_type or tag_year or tag_untagged)
-
-    if not has_query and not has_tag_filters:
-        return jsonify([])
-
-    tags_data = load_tags()
-    # O(1) doc lookup by relative_path
-    doc_index = {doc.get("relative_path", ""): doc for doc in documents}
-
-    results = []
-
-    # Tag-only browse: no text query, iterate tags directly
-    if not has_query and has_tag_filters:
-        if tag_untagged:
-            # Return documents with no saved tags (or all-blank tag values)
-            tagged_nonempty = {
-                k for k, v in tags_data.items()
-                if any(str(val).strip() for val in v.values())
-            }
-            for doc in documents:
-                rel_path = doc.get("relative_path", "")
-                if rel_path not in tagged_nonempty:
-                    fname = doc.get("filename", "")
-                    results.append({
-                        "filename": fname,
-                        "path": rel_path,
-                        "snippet": doc.get("text", "")[:300],
-                        "company": extract_company_from_filename(fname) or "",
-                        "date": "",
-                        "amount": "",
-                        "tags": {},
-                    })
-        else:
-            for rel_path, tag in tags_data.items():
-                if tag_type and tag.get("type", "").lower() != tag_type:
-                    continue
-                if tag_year and tag.get("year", "") != tag_year:
-                    continue
-                doc = doc_index.get(rel_path)
-                if not doc:
-                    continue
-                text = doc.get("text", "")
-                fname = doc.get("filename", "")
-                results.append({
-                    "filename": fname,
-                    "path": rel_path,
-                    "snippet": text[:300],
-                    "company": (tag.get("company")
-                                or extract_company(text)
-                                or extract_company_from_filename(fname)
-                                or ""),
-                    "date": tag.get("year") or extract_date(text) or "",
-                    "amount": extract_total_amount(text) or "",
-                    "tags": tag,
-                })
-        return jsonify(results[offset:offset + limit])
-
-    # Normal search (with or without tag filters)
-    if search_type == "semantic" and HAS_EMBEDDINGS:
-        try:
-            top_k = 50 if has_tag_filters else 10
-            search_results = semantic_search(q, top_k=top_k)
-            # Enrich semantic results with extracted metadata
-            for r in search_results:
-                doc = doc_index.get(r.get("path", ""), {})
-                text = doc.get("text", "") if doc else ""
-                r["company"] = extract_company(text) or ""
-                r["date"] = extract_date(text) or ""
-                r["amount"] = extract_total_amount(text) or ""
-            results = search_results
-        except Exception as e:
-            print(f"Semantic search error: {e}")
-            results = text_search(q, filter_company, filter_date, filter_amount, filter_mode)
-    else:
-        results = text_search(q, filter_company, filter_date, filter_amount, filter_mode)
-
-    # Enrich results with tag data
-    for r in results:
-        r["tags"] = tags_data.get(r.get("path", ""), {})
-
-    # Apply tag filters if set
-    if has_tag_filters:
-        filtered = []
-        for r in results:
-            t = r.get("tags", {})
-            if tag_type and t.get("type", "").lower() != tag_type:
-                continue
-            if tag_year and t.get("year", "") != tag_year:
-                continue
-            if tag_untagged and any(str(v).strip() for v in t.values()):
-                continue
-            filtered.append(r)
-        results = filtered
-
-    return jsonify(results[offset:offset + limit])
+_STOP_WORDS = {
+    "a", "an", "the", "at", "in", "on", "of", "for", "to",
+    "and", "or", "is", "was", "are", "with", "by", "from",
+}
 
 
-@app.route("/reindex", methods=["POST"])
-def reindex():
-    """Regenerate the PDF index and refresh the in-memory documents list.
+def text_search(conn, q, filter_company="", filter_date="",
+                filter_amount="", filter_mode="and"):
+    """FTS5-backed keyword search with optional metadata filters.
 
-    This endpoint is intentionally a POST and is intended for local/dev use.
+    Falls back to a LIKE scan if the query contains characters that would
+    cause an FTS MatchError (e.g. bare special chars, empty token set).
+    filter_mode is "and" (all filters) or "or" (any filter).
     """
-    # Authenticate with token if configured
-    if REINDEX_TOKEN:
-        provided = request.headers.get('X-Reindex-Token') or request.json and request.json.get('token')
-        if not provided or provided != REINDEX_TOKEN:
-            return jsonify({"status": "error", "error": "invalid or missing token"}), 403
-
-    # Prevent concurrent reindex jobs
-    if reindex_status["running"]:
-        return jsonify({"status": "error", "error": "reindex already running"}), 409
-
-    body = request.get_json(silent=True) or {}
-    incremental = bool(body.get("incremental", False))
-
-    # Start background worker so UI can poll status
-    import threading
-
-    def _log(msg):
-        reindex_status["logs"].append(msg)
-
-    def worker(incremental=incremental):
-        global documents
-        try:
-            reindex_status["running"] = True
-            reindex_status["logs"] = []
-            reindex_status["count"] = 0
-            reindex_status["skipped"] = 0
-            reindex_status["error"] = None
-
-            mode = "incremental" if incremental else "full"
-            _log(f"Starting {mode} reindex...")
-
-            # use package-qualified import to work regardless of cwd
-            from backend.indexer import scan_pdfs, save_index
-
-            folder = PDF_FOLDER or os.getenv("PDF_FOLDER")
-            if not folder or not os.path.isdir(folder):
-                reindex_status["error"] = "PDF_FOLDER not configured or not found"
-                _log(reindex_status["error"])
-                return
-
-            _log(f"Scanning folder: {folder}")
-
-            existing = documents if incremental else None
-
-            def progress_cb(path, idx, total, skipped=False):
-                name = path.split('/')[-1]
-                if skipped:
-                    reindex_status["skipped"] += 1
-                    _log(f"Unchanged ({idx}/{total}): {name}")
-                else:
-                    _log(f"Indexed ({idx}/{total}): {name}")
-
-            docs = scan_pdfs(folder, progress_callback=progress_cb, existing_index=existing)
-            _log(f"Saving index ({len(docs)} documents, {reindex_status['skipped']} unchanged)")
-            save_index(docs)
-
-            # update in-memory documents
-            documents = docs
-
-            reindex_status["count"] = len(docs)
-            _log("Reindex complete")
-        except Exception as e:
-            reindex_status["error"] = str(e)
-            _log(f"Error: {e}")
-        finally:
-            reindex_status["running"] = False
-
-    t = threading.Thread(target=worker, daemon=True)
-    t.start()
-
-    return jsonify({"status": "ok", "message": "reindex started", "incremental": incremental})
-
-
-@app.route('/reindex/status')
-def reindex_status_api():
-    # Return current status and last N logs
-    logs = reindex_status.get('logs', [])[-200:]
-    return jsonify({
-        'running': reindex_status.get('running', False),
-        'logs': logs,
-        'count': reindex_status.get('count', 0),
-        'skipped': reindex_status.get('skipped', 0),
-        'error': reindex_status.get('error')
-    })
-
-@app.route("/tags/<path:filename>", methods=["GET"])
-def get_doc_tags(filename):
-    """Return saved tags for a document, auto-populated from extraction if not yet set."""
-    tags_data = load_tags()
-    tag = tags_data.get(filename, {})
-    if not tag:
-        for doc in documents:
-            if doc.get("relative_path") == filename or doc.get("path", "").endswith(filename):
-                text = doc.get("text", "")
-                fname = doc.get("filename", "")
-                date = extract_date(text) or ""
-                year = date[:4] if date else ""
-                company = (extract_company(text)
-                           or extract_company_from_filename(fname)
-                           or "")
-                tag = {
-                    "type": "",
-                    "company": company,
-                    "year": year,
-                    "auto": True,
-                }
-                break
-    return jsonify(tag)
-
-
-@app.route("/tags/<path:filename>", methods=["POST"])
-def save_doc_tags(filename):
-    """Save user-applied tags for a document."""
-    data = request.get_json(force=True) or {}
-    tags_data = load_tags()
-    tags_data[filename] = {
-        "type": data.get("type", ""),
-        "company": data.get("company", ""),
-        "year": str(data.get("year", "")),
-        "amount": normalise_amount(data.get("amount", "")),
-        "invoice_number": data.get("invoice_number", ""),
-    }
-    with open(TAGS_FILE, "w", encoding="utf-8") as f:
-        json.dump(tags_data, f, indent=2)
-    return jsonify({"status": "ok"})
-
-
-def text_search(q, filter_company="", filter_date="", filter_amount="", filter_mode="and"):
-    """Search by keyword and optional filters.
-
-    filter_mode may be "and" (all filters must match) or "or" (any filter).
-    """
-    _STOP_WORDS = {'a', 'an', 'the', 'at', 'in', 'on', 'of', 'for', 'to', 'and', 'or', 'is', 'was', 'are', 'with', 'by', 'from'}
-    results = []
     tokens = [t for t in q.lower().split() if t not in _STOP_WORDS] if q else []
 
-    for doc in documents:
-        # Check keyword match — all meaningful tokens must appear in text or filename
-        doc_text = (doc.get("text", "") + " " + doc.get("filename", "")).lower()
-        text_match = (not tokens) or all(t in doc_text for t in tokens)
-        if not text_match:
-            continue
-        
-        # Extract metadata for filtering
-        text_content = doc.get("text", "")
+    if tokens:
+        match_expr = " AND ".join(tokens)
+        try:
+            rows = conn.execute(
+                """
+                SELECT d.filename,
+                       d.relative_path,
+                       d.text,
+                       snippet(documents_fts, 1, '', '', '...', 20) AS fts_snippet
+                FROM documents_fts
+                JOIN documents d ON d.id = documents_fts.rowid
+                WHERE documents_fts MATCH ?
+                ORDER BY rank
+                """,
+                (match_expr,),
+            ).fetchall()
+        except Exception:
+            # MatchError fallback — simple LIKE across filename + text
+            pattern = f"%{q.lower()}%"
+            rows = conn.execute(
+                """
+                SELECT filename, relative_path, text,
+                       substr(text, 1, 300) AS fts_snippet
+                FROM documents
+                WHERE lower(text || ' ' || filename) LIKE ?
+                """,
+                (pattern,),
+            ).fetchall()
+    else:
+        rows = conn.execute(
+            """
+            SELECT filename, relative_path, text,
+                   substr(text, 1, 300) AS fts_snippet
+            FROM documents
+            """
+        ).fetchall()
+
+    results = []
+    for row in rows:
+        text_content = row["text"]
         company = extract_company(text_content) or ""
         date = extract_date(text_content) or ""
         amount = extract_total_amount(text_content) or ""
-        
-        # Compute individual filter booleans
-        pass_company = True
-        pass_date = True
-        pass_amount = True
+
+        pass_company = pass_date = pass_amount = True
 
         if filter_company:
             pass_company = filter_company in company.lower()
@@ -371,78 +156,402 @@ def text_search(q, filter_company="", filter_date="", filter_amount="", filter_m
                 else:
                     min_amt = max_amt = float(filter_amount)
                 amount_num = float(re.sub(r"[^0-9.]", "", amount)) if amount else 0
-                pass_amount = (min_amt <= amount_num <= max_amt)
+                pass_amount = min_amt <= amount_num <= max_amt
             except ValueError:
                 pass_amount = True
 
         if filter_mode == "or":
             if not (pass_company or pass_date or pass_amount):
                 continue
-        else:  # and
+        else:
             if not (pass_company and pass_date and pass_amount):
                 continue
 
         results.append({
-            "filename": doc["filename"],
-            "path": doc.get("relative_path", doc["path"]),
-            "snippet": doc.get("text", "")[:300],
+            "filename": row["filename"],
+            "path": row["relative_path"],
+            "snippet": row["fts_snippet"] or text_content[:300],
             "company": company,
             "date": date,
-            "amount": amount
+            "amount": amount,
         })
-    
+
     return results
+
+
+def _tag_browse(conn, tag_type, tag_year, tag_untagged):
+    """Return results for tag-only browse (no text query)."""
+    results = []
+
+    if tag_untagged:
+        # Documents with no tag row at all, or with all-blank tag values
+        rows = conn.execute(
+            """
+            SELECT d.filename, d.relative_path, d.text
+            FROM documents d
+            LEFT JOIN tags t ON t.relative_path = d.relative_path
+            WHERE t.relative_path IS NULL
+               OR (TRIM(COALESCE(t.type, '')) = ''
+               AND TRIM(COALESCE(t.company, '')) = ''
+               AND TRIM(COALESCE(t.year, '')) = '')
+            """
+        ).fetchall()
+        for row in rows:
+            fname = row["filename"]
+            results.append({
+                "filename": fname,
+                "path": row["relative_path"],
+                "snippet": row["text"][:300],
+                "company": extract_company_from_filename(fname) or "",
+                "date": "",
+                "amount": "",
+                "tags": {},
+            })
+    else:
+        conditions, params = [], []
+        if tag_type:
+            conditions.append("LOWER(t.type) = ?")
+            params.append(tag_type)
+        if tag_year:
+            conditions.append("t.year = ?")
+            params.append(tag_year)
+        where = ("WHERE " + " AND ".join(conditions)) if conditions else ""
+        rows = conn.execute(
+            f"""
+            SELECT d.filename, d.relative_path, d.text,
+                   t.type, t.company, t.year, t.amount, t.invoice_number, t.status
+            FROM tags t
+            JOIN documents d ON d.relative_path = t.relative_path
+            {where}
+            """,
+            params,
+        ).fetchall()
+        for row in rows:
+            tag = {
+                "type": row["type"],
+                "company": row["company"],
+                "year": row["year"],
+                "amount": row["amount"],
+                "invoice_number": row["invoice_number"],
+                "status": row["status"],
+            }
+            text = row["text"]
+            fname = row["filename"]
+            results.append({
+                "filename": fname,
+                "path": row["relative_path"],
+                "snippet": text[:300],
+                "company": (tag.get("company")
+                            or extract_company(text)
+                            or extract_company_from_filename(fname)
+                            or ""),
+                "date": tag.get("year") or extract_date(text) or "",
+                "amount": extract_total_amount(text) or "",
+                "tags": tag,
+            })
+
+    return results
+
+
+def _attach_tags(conn, results):
+    """Batch-fetch tags for a result list and attach them in-place."""
+    if not results:
+        return
+    paths = [r["path"] for r in results]
+    placeholders = ",".join("?" * len(paths))
+    rows = conn.execute(
+        f"SELECT relative_path, type, company, year, amount, invoice_number, status "
+        f"FROM tags WHERE relative_path IN ({placeholders})",
+        paths,
+    ).fetchall()
+    tags_map = {
+        row["relative_path"]: {
+            "type": row["type"],
+            "company": row["company"],
+            "year": row["year"],
+            "amount": row["amount"],
+            "invoice_number": row["invoice_number"],
+            "status": row["status"],
+        }
+        for row in rows
+    }
+    for r in results:
+        r["tags"] = tags_map.get(r["path"], {})
+
+
+def _apply_tag_filters(results, tag_type, tag_year, tag_untagged):
+    filtered = []
+    for r in results:
+        t = r.get("tags", {})
+        if tag_type and t.get("type", "").lower() != tag_type:
+            continue
+        if tag_year and t.get("year", "") != tag_year:
+            continue
+        if tag_untagged and any(str(v).strip() for v in t.values()):
+            continue
+        filtered.append(r)
+    return filtered
+
+
+# ---------------------------------------------------------------------------
+# Routes
+# ---------------------------------------------------------------------------
+
+@app.route("/")
+def home():
+    return render_template(
+        "search.html",
+        has_embeddings=HAS_EMBEDDINGS,
+        reindex_token_present=bool(REINDEX_TOKEN),
+        version=APP_VERSION,
+    )
+
+
+@app.route("/search")
+def search():
+    q = request.args.get("q", "").lower()
+    search_type = request.args.get("type", "semantic" if HAS_EMBEDDINGS else "text")
+    filter_company = request.args.get("company", "").lower()
+    filter_date = request.args.get("date", "")
+    filter_amount = request.args.get("amount", "")
+    filter_mode = request.args.get("mode", "and").lower()
+    tag_type = request.args.get("tag_type", "").lower()
+    tag_year = request.args.get("tag_year", "")
+    tag_untagged = request.args.get("tag_untagged", "").lower() in ("1", "true")
+
+    try:
+        limit = min(max(int(request.args.get("limit", 20)), 1), 200)
+        offset = max(int(request.args.get("offset", 0)), 0)
+    except (ValueError, TypeError):
+        limit, offset = 20, 0
+
+    has_query = bool(q or filter_company or filter_date or filter_amount)
+    has_tag_filters = bool(tag_type or tag_year or tag_untagged)
+
+    if not has_query and not has_tag_filters:
+        return jsonify([])
+
+    conn = get_db()
+
+    if not has_query and has_tag_filters:
+        results = _tag_browse(conn, tag_type, tag_year, tag_untagged)
+        return jsonify(results[offset:offset + limit])
+
+    # Text or semantic search
+    if search_type == "semantic" and HAS_EMBEDDINGS:
+        try:
+            top_k = 50 if has_tag_filters else 10
+            results = semantic_search(q, top_k=top_k)
+            for r in results:
+                row = conn.execute(
+                    "SELECT text FROM documents WHERE relative_path = ?",
+                    (r.get("path", ""),),
+                ).fetchone()
+                text = row["text"] if row else ""
+                r["company"] = extract_company(text) or ""
+                r["date"] = extract_date(text) or ""
+                r["amount"] = extract_total_amount(text) or ""
+        except Exception as e:
+            print(f"Semantic search error: {e}")
+            results = text_search(
+                conn, q, filter_company, filter_date, filter_amount, filter_mode
+            )
+    else:
+        results = text_search(
+            conn, q, filter_company, filter_date, filter_amount, filter_mode
+        )
+
+    _attach_tags(conn, results)
+
+    if has_tag_filters:
+        results = _apply_tag_filters(results, tag_type, tag_year, tag_untagged)
+
+    return jsonify(results[offset:offset + limit])
+
+
+@app.route("/reindex", methods=["POST"])
+def reindex():
+    """Start a background reindex job."""
+    if REINDEX_TOKEN:
+        provided = (request.headers.get("X-Reindex-Token")
+                    or (request.json or {}).get("token"))
+        if not provided or provided != REINDEX_TOKEN:
+            return jsonify({"status": "error", "error": "invalid or missing token"}), 403
+
+    if reindex_status["running"]:
+        return jsonify({"status": "error", "error": "reindex already running"}), 409
+
+    body = request.get_json(silent=True) or {}
+    incremental = bool(body.get("incremental", False))
+
+    def _log(msg):
+        reindex_status["logs"].append(msg)
+
+    def worker(incremental=incremental):
+        # Background thread — cannot use Flask g; open its own DB connection.
+        conn = None
+        try:
+            reindex_status["running"] = True
+            reindex_status["logs"] = []
+            reindex_status["count"] = 0
+            reindex_status["skipped"] = 0
+            reindex_status["error"] = None
+
+            mode = "incremental" if incremental else "full"
+            _log(f"Starting {mode} reindex...")
+
+            from backend.indexer import scan_pdfs, save_index_to_db
+            from backend.database import get_connection as _conn
+
+            folder = PDF_FOLDER or os.getenv("PDF_FOLDER")
+            if not folder or not os.path.isdir(folder):
+                reindex_status["error"] = "PDF_FOLDER not configured or not found"
+                _log(reindex_status["error"])
+                return
+
+            _log(f"Scanning folder: {folder}")
+            conn = _conn()
+
+            def progress_cb(path, idx, total, skipped=False):
+                name = path.split("/")[-1]
+                if skipped:
+                    reindex_status["skipped"] += 1
+                    _log(f"Unchanged ({idx}/{total}): {name}")
+                else:
+                    _log(f"Indexed ({idx}/{total}): {name}")
+
+            docs = scan_pdfs(
+                folder,
+                progress_callback=progress_cb,
+                db_conn=conn,
+            )
+            _log(f"Saving index ({len(docs)} documents, "
+                 f"{reindex_status['skipped']} unchanged)")
+
+            save_index_to_db(conn, docs, incremental=incremental)
+
+            reindex_status["count"] = len(docs)
+            _log("Reindex complete")
+
+        except Exception as e:
+            reindex_status["error"] = str(e)
+            _log(f"Error: {e}")
+        finally:
+            reindex_status["running"] = False
+            if conn:
+                conn.close()
+
+    threading.Thread(target=worker, daemon=True).start()
+    return jsonify({"status": "ok", "message": "reindex started", "incremental": incremental})
+
+
+@app.route("/reindex/status")
+def reindex_status_api():
+    logs = reindex_status.get("logs", [])[-200:]
+    return jsonify({
+        "running": reindex_status.get("running", False),
+        "logs": logs,
+        "count": reindex_status.get("count", 0),
+        "skipped": reindex_status.get("skipped", 0),
+        "error": reindex_status.get("error"),
+    })
+
+
+@app.route("/tags/<path:filename>", methods=["GET"])
+def get_doc_tags(filename):
+    """Return saved tags for a document; auto-populate from extraction if not set."""
+    conn = get_db()
+    tag = get_tag(conn, filename)
+    if not tag:
+        row = conn.execute(
+            "SELECT filename, text FROM documents WHERE relative_path = ? LIMIT 1",
+            (filename,),
+        ).fetchone()
+        if row:
+            text = row["text"]
+            fname = row["filename"]
+            date = extract_date(text) or ""
+            tag = {
+                "type": "",
+                "company": (extract_company(text)
+                            or extract_company_from_filename(fname)
+                            or ""),
+                "year": date[:4] if date else "",
+                "auto": True,
+            }
+        else:
+            tag = {}
+    return jsonify(tag)
+
+
+@app.route("/tags/<path:filename>", methods=["POST"])
+def save_doc_tags(filename):
+    """Save user-applied tags for a document."""
+    data = request.get_json(force=True) or {}
+    fields = {
+        "type": data.get("type", ""),
+        "company": data.get("company", ""),
+        "year": str(data.get("year", "")),
+        "amount": normalise_amount(data.get("amount", "")),
+        "invoice_number": data.get("invoice_number", ""),
+        "status": data.get("status", ""),
+    }
+    conn = get_db()
+    upsert_tag(conn, filename, fields)
+    conn.commit()
+    return jsonify({"status": "ok"})
+
 
 @app.route("/pdf/<path:filename>")
 def serve_pdf(filename):
-    """Serve PDF files from the configured PDF folder (inline, not download)."""
-    from flask import Response
-    import traceback
+    """Serve a PDF file inline."""
     filename = unquote(filename)
     if not PDF_FOLDER:
         return jsonify({"error": "PDF_FOLDER not configured — check .env"}), 503
     filepath = os.path.join(PDF_FOLDER, filename)
     try:
-        with open(filepath, 'rb') as f:
+        with open(filepath, "rb") as f:
             data = f.read()
-        return Response(data, mimetype='application/pdf',
-                        headers={'Content-Disposition': 'inline'})
+        return Response(data, mimetype="application/pdf",
+                        headers={"Content-Disposition": "inline"})
     except FileNotFoundError:
         return jsonify({"error": f"File not found: {filepath}"}), 404
     except PermissionError:
         return jsonify({
             "error": "permission_denied",
-            "message": "macOS has blocked access to this file. Grant Full Disk Access to Document Search in System Settings → Privacy & Security → Full Disk Access.",
-            "filepath": filepath
+            "message": (
+                "macOS has blocked access to this file. Grant Full Disk Access to "
+                "Document Search in System Settings → Privacy & Security → Full Disk Access."
+            ),
+            "filepath": filepath,
         }), 403
     except Exception as e:
-        # Log the real exception to a file next to the index for diagnosis
         try:
-            log = os.path.join(os.path.dirname(__file__), 'pdf_error.log')
-            with open(log, 'a') as lf:
+            log = os.path.join(os.path.dirname(__file__), "pdf_error.log")
+            with open(log, "a") as lf:
                 lf.write(f"path={filepath}\nexc={type(e).__name__}: {e}\n")
                 traceback.print_exc(file=lf)
                 lf.write("---\n")
         except Exception:
             pass
-        return jsonify({"error": str(e), "type": type(e).__name__, "filepath": filepath}), 500
+        return jsonify({"error": str(e), "type": type(e).__name__,
+                        "filepath": filepath}), 500
 
 
 @app.route("/companies")
 def get_companies():
-    """Return sorted list of unique company names from saved tags."""
-    tags_data = load_tags()
-    companies = sorted({
-        tag.get("company", "").strip()
-        for tag in tags_data.values()
-        if tag.get("company", "").strip()
-    })
-    return jsonify(companies)
+    """Return sorted list of unique company names from tags."""
+    conn = get_db()
+    rows = conn.execute(
+        "SELECT DISTINCT TRIM(company) AS company FROM tags "
+        "WHERE TRIM(company) != '' ORDER BY company"
+    ).fetchall()
+    return jsonify([row["company"] for row in rows])
 
 
 @app.route("/bulk_tags", methods=["POST"])
 def bulk_tags():
-    """Apply tags to multiple documents at once. Only overwrites fields that are non-empty."""
+    """Apply tags to multiple documents at once; only overwrites non-empty fields."""
     data = request.get_json(force=True) or {}
     paths = data.get("paths", [])
     if not paths:
@@ -454,30 +563,27 @@ def bulk_tags():
     }.items() if v}
     if not updates:
         return jsonify({"status": "error", "error": "no tag values provided"}), 400
-    tags_data = load_tags()
+
+    conn = get_db()
     for path in paths:
-        existing = tags_data.get(path, {})
-        tags_data[path] = {**existing, **updates}
-    with open(TAGS_FILE, "w", encoding="utf-8") as f:
-        json.dump(tags_data, f, indent=2)
+        existing = get_tag(conn, path) or {}
+        upsert_tag(conn, path, {**existing, **updates})
+    conn.commit()
     return jsonify({"status": "ok", "updated": len(paths)})
 
 
 @app.route("/tag_values")
 def tag_values():
-    """Return all unique values for type/company/year with document counts."""
-    from collections import defaultdict
-    tags_data = load_tags()
-    counts = {"type": defaultdict(int), "company": defaultdict(int), "year": defaultdict(int)}
-    for tag in tags_data.values():
-        for field in ("type", "company", "year"):
-            val = tag.get(field, "").strip()
-            if val:
-                counts[field][val] += 1
-    return jsonify({
-        field: dict(sorted(vals.items()))
-        for field, vals in counts.items()
-    })
+    """Return unique values for type/company/year with counts."""
+    conn = get_db()
+    result = {}
+    for field in ("type", "company", "year"):
+        rows = conn.execute(
+            f"SELECT {field} AS val, COUNT(*) AS cnt FROM tags "
+            f"WHERE TRIM({field}) != '' GROUP BY {field} ORDER BY {field}"
+        ).fetchall()
+        result[field] = {row["val"]: row["cnt"] for row in rows}
+    return jsonify(result)
 
 
 @app.route("/rename_tag", methods=["POST"])
@@ -489,71 +595,60 @@ def rename_tag():
     new_value = data.get("new_value", "").strip()
     if field not in ("type", "company", "year") or not old_value:
         return jsonify({"status": "error", "error": "invalid field or value"}), 400
-    tags_data = load_tags()
-    updated = 0
-    for tag in tags_data.values():
-        if tag.get(field, "").strip() == old_value:
-            tag[field] = new_value
-            updated += 1
-    with open(TAGS_FILE, "w", encoding="utf-8") as f:
-        json.dump(tags_data, f, indent=2)
-    return jsonify({"status": "ok", "updated": updated})
+
+    conn = get_db()
+    cursor = conn.execute(
+        f"UPDATE tags SET {field} = ?, updated_at = datetime('now') "
+        f"WHERE TRIM({field}) = ?",
+        (new_value, old_value),
+    )
+    conn.commit()
+    return jsonify({"status": "ok", "updated": cursor.rowcount})
 
 
 @app.route("/stats")
 def stats():
-    """Return index document count and last-indexed timestamp."""
-    from datetime import datetime
+    """Return document count and last-indexed timestamp."""
+    conn = get_db()
+    doc_count = get_document_count(conn)
+    # Use the DB file's mtime as the last-indexed timestamp
     last_indexed = None
-    if os.path.exists(INDEX_FILE):
-        mtime = os.path.getmtime(INDEX_FILE)
+    if os.path.exists(_DB_PATH):
+        mtime = os.path.getmtime(_DB_PATH)
         last_indexed = datetime.fromtimestamp(mtime).strftime("%-d %b %Y, %H:%M")
-    return jsonify({"doc_count": len(documents), "last_indexed": last_indexed})
+    return jsonify({"doc_count": doc_count, "last_indexed": last_indexed})
 
 
 @app.route("/stats/breakdown")
 def stats_breakdown():
     """Return tag value counts grouped by type, company, and year."""
-    tags_data = load_tags()
-    by_type = {}
-    by_company = {}
-    by_year = {}
-    tagged = 0
-    for tag in tags_data.values():
-        has_any = False
-        t = tag.get("type", "").strip()
-        c = tag.get("company", "").strip()
-        y = tag.get("year", "").strip()
-        if t:
-            by_type[t] = by_type.get(t, 0) + 1
-            has_any = True
-        if c:
-            by_company[c] = by_company.get(c, 0) + 1
-            has_any = True
-        if y:
-            by_year[y] = by_year.get(y, 0) + 1
-            has_any = True
-        if has_any:
-            tagged += 1
-    # Sort by count descending
-    by_type = dict(sorted(by_type.items(), key=lambda x: -x[1]))
-    by_company = dict(sorted(by_company.items(), key=lambda x: -x[1]))
-    by_year = dict(sorted(by_year.items(), key=lambda x: -x[1]))
+    conn = get_db()
+    doc_count = get_document_count(conn)
+
+    def _counts(field):
+        rows = conn.execute(
+            f"SELECT {field} AS val, COUNT(*) AS cnt FROM tags "
+            f"WHERE TRIM({field}) != '' GROUP BY {field} ORDER BY cnt DESC"
+        ).fetchall()
+        return {row["val"]: row["cnt"] for row in rows}
+
+    tagged = conn.execute(
+        "SELECT COUNT(*) FROM tags "
+        "WHERE TRIM(type) != '' OR TRIM(company) != '' OR TRIM(year) != ''"
+    ).fetchone()[0]
+
     return jsonify({
-        "total_docs": len(documents),
+        "total_docs": doc_count,
         "tagged_docs": tagged,
-        "by_type": by_type,
-        "by_company": by_company,
-        "by_year": by_year,
+        "by_type": _counts("type"),
+        "by_company": _counts("company"),
+        "by_year": _counts("year"),
     })
 
 
 @app.route("/export/csv")
 def export_csv():
-    """Export all matching search results (with tags) as a CSV file."""
-    import csv
-    import io
-
+    """Export matching results with tags as a CSV file."""
     q = request.args.get("q", "").lower()
     filter_company = request.args.get("company", "").lower()
     filter_date = request.args.get("date", "")
@@ -563,50 +658,58 @@ def export_csv():
     tag_year = request.args.get("tag_year", "")
     tag_untagged = request.args.get("tag_untagged", "").lower() in ("1", "true")
 
-    tags_data = load_tags()
-
     has_query = bool(q or filter_company or filter_date or filter_amount)
     has_tag_filters = bool(tag_type or tag_year or tag_untagged)
 
+    conn = get_db()
+
     if has_query:
-        results = text_search(q, filter_company, filter_date, filter_amount, filter_mode)
-        for r in results:
-            r["tags"] = tags_data.get(r.get("path", ""), {})
+        results = text_search(conn, q, filter_company, filter_date,
+                               filter_amount, filter_mode)
+        _attach_tags(conn, results)
     else:
-        # No text query: pull from all documents (optionally filtered by tag)
-        doc_index = {doc.get("relative_path", ""): doc for doc in documents}
+        rows = conn.execute(
+            """
+            SELECT d.filename, d.relative_path, d.text,
+                   COALESCE(t.type, '') AS type,
+                   COALESCE(t.company, '') AS company,
+                   COALESCE(t.year, '') AS year,
+                   COALESCE(t.amount, '') AS amount,
+                   COALESCE(t.invoice_number, '') AS invoice_number,
+                   COALESCE(t.status, '') AS status
+            FROM documents d
+            LEFT JOIN tags t ON t.relative_path = d.relative_path
+            """
+        ).fetchall()
         results = []
-        for rel_path, doc in doc_index.items():
-            fname = doc.get("filename", "")
-            text = doc.get("text", "")
-            tag = tags_data.get(rel_path, {})
+        for row in rows:
+            text = row["text"]
+            fname = row["filename"]
+            tag = {
+                "type": row["type"],
+                "company": row["company"],
+                "year": row["year"],
+                "amount": row["amount"],
+                "invoice_number": row["invoice_number"],
+                "status": row["status"],
+            }
             results.append({
                 "filename": fname,
-                "path": rel_path,
+                "path": row["relative_path"],
                 "snippet": text[:300],
-                "company": tag.get("company") or extract_company(text) or extract_company_from_filename(fname) or "",
-                "date": tag.get("year") or extract_date(text) or "",
+                "company": tag["company"] or extract_company(text) or extract_company_from_filename(fname) or "",
+                "date": tag["year"] or extract_date(text) or "",
                 "amount": extract_total_amount(text) or "",
                 "tags": tag,
             })
 
-    # Apply tag filters
     if has_tag_filters:
-        filtered = []
-        for r in results:
-            t = r.get("tags", {})
-            if tag_type and t.get("type", "").lower() != tag_type:
-                continue
-            if tag_year and t.get("year", "") != tag_year:
-                continue
-            if tag_untagged and any(str(v).strip() for v in t.values()):
-                continue
-            filtered.append(r)
-        results = filtered
+        results = _apply_tag_filters(results, tag_type, tag_year, tag_untagged)
 
     output = io.StringIO()
     writer = csv.writer(output)
-    writer.writerow(["Filename", "Company", "Type", "Year", "Amount", "Invoice Number", "Path"])
+    writer.writerow(["Filename", "Company", "Type", "Year", "Amount",
+                     "Invoice Number", "Path"])
     for r in results:
         tag = r.get("tags", {})
         writer.writerow([
@@ -620,168 +723,124 @@ def export_csv():
         ])
 
     output.seek(0)
-    from flask import Response
     return Response(
         output.getvalue(),
         mimetype="text/csv",
-        headers={"Content-Disposition": "attachment; filename=documents_export.csv"}
+        headers={"Content-Disposition": "attachment; filename=documents_export.csv"},
     )
 
 
 @app.route("/debug")
 def debug_info():
-    """Diagnostic endpoint — returns server-side config for troubleshooting."""
+    """Diagnostic endpoint."""
     import glob as _glob
     sample = []
     if PDF_FOLDER and os.path.isdir(PDF_FOLDER):
-        sample = [os.path.basename(p) for p in _glob.glob(os.path.join(PDF_FOLDER, "*.pdf"))[:3]]
+        sample = [os.path.basename(p)
+                  for p in _glob.glob(os.path.join(PDF_FOLDER, "*.pdf"))[:3]]
+    conn = get_db()
     return jsonify({
         "PDF_FOLDER": PDF_FOLDER,
         "PDF_FOLDER_exists": os.path.isdir(PDF_FOLDER) if PDF_FOLDER else False,
         "sample_files": sample,
         "cwd": os.getcwd(),
-        "index_docs": len(documents),
+        "index_docs": get_document_count(conn),
+        "db_path": _DB_PATH,
     })
+
 
 @app.route("/summary/<path:filename>")
 def get_summary(filename):
-    """Generate and return a focused summary of a PDF file."""
+    """Return extracted metadata summary for a document."""
     try:
-        # Find the document in our index
-        doc = None
-        for d in documents:
-            if d.get("relative_path") == filename or d.get("path").endswith(filename):
-                doc = d
-                break
-        
-        if not doc:
+        conn = get_db()
+        row = conn.execute(
+            "SELECT filename, text FROM documents WHERE relative_path = ? LIMIT 1",
+            (filename,),
+        ).fetchone()
+        if not row:
             return jsonify({"error": "Document not found"}), 404
-        
-        text = doc.get("text", "")
-        
-        summary = {
-            "filename": doc.get("filename", "")
-        }
-        
-        # Extract company/vendor name
+
+        text = row["text"]
+        summary = {"filename": row["filename"]}
         company = extract_company(text)
         if company:
             summary["company"] = company
-        
-        # Extract invoice date
         invoice_date = extract_date(text)
         if invoice_date:
             summary["date"] = invoice_date
-        
-        # Extract invoice amount
         total_amount = extract_total_amount(text)
         if total_amount:
             summary["amount"] = total_amount
-        
-        # Invoice number
         invoice_num = extract_invoice_number(text)
         if invoice_num:
             summary["invoice_number"] = invoice_num
-        
         return jsonify(summary)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-def extract_company_from_filename(filename):
-    """Try to infer a company name from the PDF filename.
 
-    Many filenames look like 'Spark Invoice 2024.pdf' or 'spark_nz_receipt_01.pdf'.
-    We strip the extension, replace separators, remove common noise words and
-    return the first meaningful words as a candidate company name.
-    """
-    import re
+# ---------------------------------------------------------------------------
+# Extraction helpers (unchanged)
+# ---------------------------------------------------------------------------
+
+def extract_company_from_filename(filename):
     name = os.path.splitext(filename)[0]
-    name = re.sub(r'[_\-]+', ' ', name)
-    # Remove common document-type and date noise
-    noise = (r'\b(invoice|receipt|statement|quote|contract|tax|gst|nz|pdf|'
-             r'final|draft|copy|order|ref|no|number|'
-             r'\d{4}|\d{1,2}[/-]\d{1,2}(?:[/-]\d{2,4})?)\b')
-    cleaned = re.sub(noise, '', name, flags=re.IGNORECASE).strip()
+    name = re.sub(r"[_\-]+", " ", name)
+    noise = (r"\b(invoice|receipt|statement|quote|contract|tax|gst|nz|pdf|"
+             r"final|draft|copy|order|ref|no|number|"
+             r"\d{4}|\d{1,2}[/-]\d{1,2}(?:[/-]\d{2,4})?)\b")
+    cleaned = re.sub(noise, "", name, flags=re.IGNORECASE).strip()
     words = [w for w in cleaned.split() if len(w) > 1]
-    if words:
-        return ' '.join(words[:3])
-    return None
+    return " ".join(words[:3]) if words else None
 
 
 def extract_company(text):
-    """Extract company/vendor name from text."""
-    lines = text.split('\n')
-    
-    # Look for common company keywords
-    company_keywords = ['from:', 'vendor:', 'billed by:', 'company:', 'invoice from:']
-    
-    for i, line in enumerate(lines[:30]):  # Check first 30 lines
+    lines = text.split("\n")
+    company_keywords = ["from:", "vendor:", "billed by:", "company:", "invoice from:"]
+    for line in lines[:30]:
         line_lower = line.lower()
         for keyword in company_keywords:
             if keyword in line_lower:
-                # Get the part after the keyword
-                parts = line.split(':')
+                parts = line.split(":")
                 if len(parts) > 1:
                     company = parts[-1].strip()
                     if company and len(company) > 2:
                         return company[:100]
-    
-    # If no keyword found, look for first capitalized line that looks like a company
     for line in lines[:20]:
         line = line.strip()
-        if line and len(line) > 5 and len(line) < 80:
-            # Check if it looks like a company name (mostly caps or Title Case)
+        if line and 5 < len(line) < 80:
             if any(c.isupper() for c in line) and not any(c.isdigit() for c in line[:5]):
                 return line
-    
     return None
+
 
 def extract_date(text):
-    """Extract invoice date from text."""
-    import re
-    
-    # Look for date patterns near "date:" or "invoice date:" first
-    keywords = ['date:', 'date ', 'dated ', 'invoice date:']
-    lines = text.split('\n')
-    
+    keywords = ["date:", "date ", "dated ", "invoice date:"]
+    lines = text.split("\n")
     for line in lines[:30]:
-        line_lower = line.lower()
-        for keyword in keywords:
-            if keyword in line_lower:
-                # Extract date from this line
-                dates = re.findall(
-                    r'(\d{1,2}[/-]\d{1,2}[/-]\d{2,4}|\d{4}[/-]\d{1,2}[/-]\d{1,2})',
-                    line
-                )
-                if dates:
-                    return dates[0]
-    
-    # Fallback: find any date in the text
+        if any(kw in line.lower() for kw in keywords):
+            dates = re.findall(
+                r"(\d{1,2}[/-]\d{1,2}[/-]\d{2,4}|\d{4}[/-]\d{1,2}[/-]\d{1,2})",
+                line,
+            )
+            if dates:
+                return dates[0]
     all_dates = re.findall(
-        r'(\d{1,2}[/-]\d{1,2}[/-]\d{2,4}|\d{4}[/-]\d{1,2}[/-]\d{1,2})',
-        text[:500]
+        r"(\d{1,2}[/-]\d{1,2}[/-]\d{2,4}|\d{4}[/-]\d{1,2}[/-]\d{1,2})",
+        text[:500],
     )
-    if all_dates:
-        return all_dates[0]
-    
-    return None
+    return all_dates[0] if all_dates else None
+
 
 def normalise_amount(raw):
-    """Normalise an amount string to a consistent '$1,234.56' format.
-
-    Handles inputs like '$1234', '1234.5', 'NZ$1,234.56', '1 234.00 NZD'.
-    Returns empty string if the value cannot be parsed.
-    """
-    import re as _re
     if not raw:
         return ""
     raw = str(raw).strip()
-    # Detect NZD prefix/suffix
-    nzd = bool(_re.search(r'NZ\$|NZD', raw, _re.IGNORECASE))
-    # Strip everything except digits and decimal point
-    digits = _re.sub(r'[^\d.]', '', raw)
+    nzd = bool(re.search(r"NZ\$|NZD", raw, re.IGNORECASE))
+    digits = re.sub(r"[^\d.]", "", raw)
     if not digits:
-        return raw  # can't parse — return as-is
+        return raw
     try:
         value = float(digits)
     except ValueError:
@@ -791,73 +850,49 @@ def normalise_amount(raw):
 
 
 def extract_total_amount(text):
-    """Extract the total/invoice amount from text."""
-    import re
-    
-    # Look for "total" or "amount due" patterns with amounts
-    keywords = ['total:', 'amount due:', 'total amount:', 'invoice total:', 'balance due:']
-    lines = text.split('\n')
-    
-    for line in lines:
-        line_lower = line.lower()
-        for keyword in keywords:
-            if keyword in line_lower:
-                # Extract amount from this line
-                amounts = re.findall(
-                    r'\$[\d,]+\.?\d{0,2}|NZ\$[\d,]+\.?\d{0,2}|[\d,]+\.\d{2}(?:\s*NZD?)?',
-                    line
-                )
-                if amounts:
-                    return normalise_amount(amounts[-1])
-    
-    # Fallback: find the largest amount in the document
-    all_amounts = re.findall(
-        r'\$[\d,]+\.?\d{0,2}|NZ\$[\d,]+\.?\d{0,2}',
-        text
-    )
+    keywords = ["total:", "amount due:", "total amount:", "invoice total:", "balance due:"]
+    for line in text.split("\n"):
+        if any(kw in line.lower() for kw in keywords):
+            amounts = re.findall(
+                r"\$[\d,]+\.?\d{0,2}|NZ\$[\d,]+\.?\d{0,2}|[\d,]+\.\d{2}(?:\s*NZD?)?",
+                line,
+            )
+            if amounts:
+                return normalise_amount(amounts[-1])
+    all_amounts = re.findall(r"\$[\d,]+\.?\d{0,2}|NZ\$[\d,]+\.?\d{0,2}", text)
     if all_amounts:
-        # Try to parse and return the largest
         try:
-            def parse_amount(s):
-                return float(re.sub(r'[^\d.]', '', s))
-            largest = max(all_amounts, key=parse_amount)
+            largest = max(all_amounts, key=lambda s: float(re.sub(r"[^\d.]", "", s)))
             return normalise_amount(largest)
-        except:
+        except Exception:
             return normalise_amount(all_amounts[-1])
-    
     return None
+
 
 def extract_invoice_number(text):
-    """Extract invoice/reference number from text."""
-    import re
-    
-    keywords = ['invoice #:', 'invoice no:', 'invoice number:', 'ref:', 'reference:', 'inv#:']
-    lines = text.split('\n')
-    
-    for line in lines[:40]:
-        line_lower = line.lower()
-        for keyword in keywords:
-            if keyword in line_lower:
-                # Extract the number
-                parts = line.split(':')
-                if len(parts) > 1:
-                    num = parts[-1].strip().split()[0]  # Get first token
-                    if num and len(num) < 30 and (any(c.isdigit() for c in num)):
-                        return num
-    
+    keywords = ["invoice #:", "invoice no:", "invoice number:", "ref:", "reference:", "inv#:"]
+    for line in text.split("\n")[:40]:
+        if any(kw in line.lower() for kw in keywords):
+            parts = line.split(":")
+            if len(parts) > 1:
+                num = parts[-1].strip().split()[0] if parts[-1].strip() else ""
+                if num and len(num) < 30 and any(c.isdigit() for c in num):
+                    return num
     return None
 
-if __name__ == "__main__":
-    # allow port override via environment variable (useful when 5000 is occupied)
-    import socket
 
+# ---------------------------------------------------------------------------
+# Entry point
+# ---------------------------------------------------------------------------
+
+if __name__ == "__main__":
     def find_free(preferred):
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         try:
-            s.bind(('127.0.0.1', preferred))
+            s.bind(("127.0.0.1", preferred))
             return s.getsockname()[1]
         except OSError:
-            s.bind(('127.0.0.1', 0))
+            s.bind(("127.0.0.1", 0))
             return s.getsockname()[1]
         finally:
             s.close()
@@ -873,4 +908,4 @@ if __name__ == "__main__":
         app.run(host="127.0.0.1", port=port, debug=True)
     except OSError as e:
         print(str(e))
-        print(f"Failed to start server on port {port}. You may need to choose a different PORT or stop the process using it.")
+        print(f"Failed to start server on port {port}.")

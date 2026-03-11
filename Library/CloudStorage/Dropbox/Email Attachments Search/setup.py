@@ -34,10 +34,12 @@ OPTIONS = {
     'includes': [
         'backend.app',
         'backend.indexer',
+        'backend.database',
         'backend.embeddings',
         # explicitly include compiled extensions
         'charset_normalizer.md__mypyc',
         '_cffi_backend',
+        '_sqlite3',
     ],
     'resources': [
         'backend/templates',
