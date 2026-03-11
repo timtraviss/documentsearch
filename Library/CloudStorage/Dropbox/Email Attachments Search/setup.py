@@ -61,8 +61,8 @@ OPTIONS = {
         'LSBackgroundOnly': False,
         'NSPrincipalClass': 'NSApplication',
         'CFBundleIdentifier': 'com.personal.documentsearch',
-        'CFBundleVersion': '0.1.0',
-        'CFBundleShortVersionString': '0.1',
+        'CFBundleVersion': '0.2.0',
+        'CFBundleShortVersionString': '0.2',
         'NSDesktopFolderUsageDescription': 'Document Search needs access to read PDF files from your folders.',
         'NSDocumentsFolderUsageDescription': 'Document Search needs access to read PDF files from your folders.',
         'NSDownloadsFolderUsageDescription': 'Document Search needs access to read PDF files from your folders.',
@@ -71,7 +71,7 @@ OPTIONS = {
 
 setup(
     name='Document Search',
-    version='0.1.0',
+    version='0.2.0',
     description='Search and index PDF documents from your email attachments',
     author='Timothy Traviss',
     url='https://github.com/timtraviss/documentsearch',

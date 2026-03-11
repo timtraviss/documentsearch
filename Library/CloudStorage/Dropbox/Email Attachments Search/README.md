@@ -358,6 +358,11 @@ Replace `index.json` + `tags.json` with a single SQLite database (`backend/searc
 ### Backup note
 The DB is stored in the Dropbox project folder (`backend/search.db`), giving automatic cloud backup and Dropbox version history. Tags were previously stored in `~/Library/Application Support/` with no backup.
 
+## Version History
+
+- **v0.2** — 2026-03-12 12:15 — Fix py2app bundle DB path via `DB_PATH` env var; add `.env` sync to `sync_bundle.sh`; add version bumping and timestamp to `/ship` skill
+- **v0.1** — Initial release — SQLite + FTS5 migration replacing flat JSON files
+
 ## License
 
 Private project for personal use.

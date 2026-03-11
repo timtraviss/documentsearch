@@ -26,6 +26,7 @@ if [ -n "$SQLITE_PKG" ] && [ ! -d "$PYLIB/sqlite3" ]; then
     cp -r "$SQLITE_PKG" "$PYLIB/sqlite3"
     echo "  Copied sqlite3 package into bundle."
 fi
+cp ".env"                         "dist/Document Search.app/Contents/Resources/.env"
 cp "$SRC/templates/search.html"   "$BUNDLE/templates/search.html"
 cp "$SRC/static/pdf.min.js"       "$BUNDLE/static/pdf.min.js"
 cp "$SRC/static/pdf.worker.min.js" "$BUNDLE/static/pdf.worker.min.js"
