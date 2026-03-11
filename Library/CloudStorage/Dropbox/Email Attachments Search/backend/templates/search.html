@@ -7,7 +7,7 @@
     <link rel="icon" type="image/png" href="{{ url_for('static', filename='favicon.png') }}">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600&family=IBM+Plex+Mono:wght@400;500&family=Instrument+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Fugaz+One&family=IBM+Plex+Mono:wght@400;500&family=Instrument+Sans:wght@400;500;600&display=swap" rel="stylesheet">
     <script src="{{ url_for('static', filename='pdf.min.js') }}"></script>
     <style>
         :root {
@@ -57,10 +57,10 @@
 
         h1 {
             font-size: 2.2rem;
-            font-weight: 600;
+            font-weight: 400;
             margin-bottom: 0.25rem;
             color: var(--ink);
-            font-family: 'Playfair Display', Georgia, serif;
+            font-family: 'Fugaz One', cursive;
         }
 
         .subtitle {
@@ -131,6 +131,10 @@
             transition: all 0.2s;
         }
 
+        button[type="submit"].search-btn:hover {
+            background: #8c3218;
+            border-color: #8c3218;
+        }
         .search-btn:hover {
             background: var(--surface-2);
             border-color: var(--border-strong);
@@ -676,7 +680,7 @@
 <div class="search-section anim-search">
             <form id="searchForm" class="search-box">
                 <input type="text" name="q" id="q" placeholder="Search by keyword, vendor, amount, date..." autocomplete="off" />
-                <button type="submit" style="background:var(--accent);color:#fff;">Search</button>
+                <button type="submit" class="search-btn" style="background:var(--accent);color:#fff;border-color:var(--accent);">Search</button>
                 <button id="clearBtn" type="button" class="search-btn">Clear</button>
                 <button id="advancedToggle" type="button" class="search-btn">⚙️ Filters</button>
                 <div style="position:relative;display:inline-flex;align-items:center;gap:0.4rem;">
