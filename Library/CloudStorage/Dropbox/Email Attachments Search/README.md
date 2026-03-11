@@ -264,6 +264,25 @@ python backend/embeddings.py  # if using AI search
 - [x] CSV export — export current search results with tags to a spreadsheet
 - [x] Stats dashboard — breakdown of documents by company, type, and year
 
+#### UI/UX redesign
+
+##### Visual design
+- [ ] Distinctive color scheme with CSS variables — move away from generic white/gray; warm document-centric palette
+- [ ] Typography upgrade — replace system-ui with a distinctive font pairing (display font for headings, monospace for filenames/amounts)
+- [ ] Atmospheric background — subtle texture or gradient instead of flat white
+- [ ] Page-load animation — staggered reveal of header, search bar, and cards on first load
+
+##### Layout & navigation
+- [ ] Collapse admin tools — move Re-index, Manage tags, Stats behind a single ⚙ menu to reduce toolbar clutter
+- [ ] Welcome / empty state — show total docs, top companies, and example searches before the user has typed anything
+- [ ] Improve result card hierarchy — make company and amount the hero text; filename secondary; larger thumbnail
+
+##### Search experience
+- [ ] Search-as-you-type — debounced (~400ms) so results appear without pressing Enter
+- [ ] Keyboard shortcut — ⌘K focuses the search bar from anywhere in the app
+
 ## License
+
+Private project for personal use.
 
 Private project for personal use.
