@@ -221,6 +221,7 @@ def reindex():
         reindex_status["logs"].append(msg)
 
     def worker(incremental=incremental):
+        global documents
         try:
             reindex_status["running"] = True
             reindex_status["logs"] = []
@@ -257,7 +258,6 @@ def reindex():
             save_index(docs)
 
             # update in-memory documents
-            global documents
             documents = docs
 
             reindex_status["count"] = len(docs)
