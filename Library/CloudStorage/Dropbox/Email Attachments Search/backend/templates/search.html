@@ -11,18 +11,19 @@
     <script src="{{ url_for('static', filename='pdf.min.js') }}"></script>
     <style>
         :root {
-          --bg:           #f0ebe0;
-          --bg-dots:      #d9d0c2;
-          --surface:      #faf6ef;
-          --surface-2:    #f0ebe0;
-          --ink:          #1a130a;
-          --ink-muted:    #7a6e62;
-          --ink-faint:    #b0a494;
-          --accent:       #a63d1f;
+          --bg:           #e0dfd5; /* soft-linen */
+          --bg-dots:      #c9c8be;
+          --surface:      #e8e9eb; /* platinum */
+          --surface-2:    #d8d9db;
+          --ink:          #313638; /* gunmetal */
+          --ink-muted:    #5e6568;
+          --ink-faint:    #9aa0a3;
+          --accent:       #f06543; /* tomato */
+          --accent-2:     #f09d51; /* sandy-brown */
           --accent-light: #fde8df;
-          --border:       #d4cab8;
-          --border-strong:#b8ac9a;
-          --shadow:       rgba(26,19,10,0.08);
+          --border:       #c4c5c8;
+          --border-strong:#a0a4a8;
+          --shadow:       rgba(49,54,56,0.10);
         }
 
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -112,7 +113,7 @@
         }
 
         button:hover {
-            background: #8c3218;
+            background: #d04a28;
         }
 
         button:active {
@@ -132,8 +133,8 @@
         }
 
         button[type="submit"].search-btn:hover {
-            background: #8c3218;
-            border-color: #8c3218;
+            background: #d04a28;
+            border-color: #d04a28;
         }
         .search-btn:hover {
             background: var(--surface-2);
