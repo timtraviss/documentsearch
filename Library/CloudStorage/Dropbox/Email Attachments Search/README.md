@@ -267,10 +267,10 @@ python backend/embeddings.py  # if using AI search
 #### UI/UX redesign
 
 ##### Visual design
-- [ ] Distinctive color scheme with CSS variables — move away from generic white/gray; warm document-centric palette
-- [ ] Typography upgrade — replace system-ui with a distinctive font pairing (display font for headings, monospace for filenames/amounts)
-- [ ] Atmospheric background — subtle texture or gradient instead of flat white
-- [ ] Page-load animation — staggered reveal of header, search bar, and cards on first load
+- [x] Distinctive color scheme with CSS variables — warm parchment palette (burnt sienna accent, ink tones)
+- [x] Typography upgrade — Playfair Display for headings, IBM Plex Mono for filenames/amounts, Instrument Sans for UI
+- [x] Atmospheric background — subtle dot-grid texture over warm parchment base
+- [x] Page-load animation — staggered fadeUp reveal of header and search bar
 
 ##### Layout & navigation
 - [ ] Collapse admin tools — move Re-index, Manage tags, Stats behind a single ⚙ menu to reduce toolbar clutter
