@@ -1148,7 +1148,7 @@
             function barSection(title, counts) {
                 const entries = Object.entries(counts);
                 if (!entries.length) return '';
-                const max = entries[0][1];
+                const max = Math.max(...entries.map(([, v]) => v));
                 let rows = entries.map(([label, count]) => {
                     const w = max ? Math.round(count / max * 100) : 0;
                     return `<div style="display:flex;align-items:center;gap:0.6rem;margin-bottom:0.45rem;">
