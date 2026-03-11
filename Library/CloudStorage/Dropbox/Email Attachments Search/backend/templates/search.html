@@ -1730,7 +1730,8 @@
                         </div>
                         <div>
                             <label>Amount</label>
-                            <input type="text" id="tagAmount" placeholder="e.g., $123.45" autocomplete="off" />
+                            <input type="text" id="tagAmount" placeholder="e.g., $123.45" autocomplete="off"
+                                   onblur="this.value = formatAmount(this.value)" />
                         </div>
                         <div>
                             <label>Invoice number</label>
@@ -1794,6 +1795,18 @@
                 'gi'
             );
             return escaped.replace(pattern, '<mark>$1</mark>');
+        }
+
+        function formatAmount(raw) {
+            if (!raw) return '';
+            raw = raw.trim();
+            const nzd = /NZ\$|NZD/i.test(raw);
+            const digits = raw.replace(/[^\d.]/g, '');
+            if (!digits) return raw;
+            const value = parseFloat(digits);
+            if (isNaN(value)) return raw;
+            const prefix = nzd ? 'NZ$' : '$';
+            return prefix + value.toLocaleString('en-NZ', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
         }
 
         function escapeHtml(text) {

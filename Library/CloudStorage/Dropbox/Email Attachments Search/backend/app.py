@@ -320,7 +320,7 @@ def save_doc_tags(filename):
         "type": data.get("type", ""),
         "company": data.get("company", ""),
         "year": str(data.get("year", "")),
-        "amount": data.get("amount", ""),
+        "amount": normalise_amount(data.get("amount", "")),
         "invoice_number": data.get("invoice_number", ""),
     }
     with open(TAGS_FILE, "w", encoding="utf-8") as f:
@@ -766,6 +766,30 @@ def extract_date(text):
     
     return None
 
+def normalise_amount(raw):
+    """Normalise an amount string to a consistent '$1,234.56' format.
+
+    Handles inputs like '$1234', '1234.5', 'NZ$1,234.56', '1 234.00 NZD'.
+    Returns empty string if the value cannot be parsed.
+    """
+    import re as _re
+    if not raw:
+        return ""
+    raw = str(raw).strip()
+    # Detect NZD prefix/suffix
+    nzd = bool(_re.search(r'NZ\$|NZD', raw, _re.IGNORECASE))
+    # Strip everything except digits and decimal point
+    digits = _re.sub(r'[^\d.]', '', raw)
+    if not digits:
+        return raw  # can't parse — return as-is
+    try:
+        value = float(digits)
+    except ValueError:
+        return raw
+    prefix = "NZ$" if nzd else "$"
+    return f"{prefix}{value:,.2f}"
+
+
 def extract_total_amount(text):
     """Extract the total/invoice amount from text."""
     import re
@@ -784,7 +808,7 @@ def extract_total_amount(text):
                     line
                 )
                 if amounts:
-                    return amounts[-1]  # Take the last amount found (usually the total)
+                    return normalise_amount(amounts[-1])
     
     # Fallback: find the largest amount in the document
     all_amounts = re.findall(
@@ -797,9 +821,9 @@ def extract_total_amount(text):
             def parse_amount(s):
                 return float(re.sub(r'[^\d.]', '', s))
             largest = max(all_amounts, key=parse_amount)
-            return largest
+            return normalise_amount(largest)
         except:
-            return all_amounts[-1]
+            return normalise_amount(all_amounts[-1])
     
     return None
 
