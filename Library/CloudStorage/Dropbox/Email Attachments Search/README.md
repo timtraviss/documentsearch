@@ -252,9 +252,9 @@ python backend/embeddings.py  # if using AI search
 - [x] Increase results limit beyond 20 (pagination or "load more")
 
 #### Tagging workflow
-- [ ] Auto-suggest tags — pre-fill company and year from extracted document text when opening a new document
-- [ ] Bulk tagging — select multiple results with checkboxes and apply tags to all at once
-- [ ] Tag management page — rename or merge tags across all documents
+- [x] Auto-suggest tags — pre-fill company and year from extracted document text when opening a new document
+- [x] Bulk tagging — select multiple results with checkboxes and apply tags to all at once
+- [x] Tag management page — rename or merge tags across all documents
 
 #### Performance
 - [ ] Incremental re-indexing — only process new/changed files (compare mtimes against index)

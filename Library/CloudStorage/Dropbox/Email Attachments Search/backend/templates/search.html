@@ -479,6 +479,55 @@
         .tag-save-btn:hover { background: #1a1a1a; }
         .tag-saved-msg { font-size: 0.8rem; color: #15803d; margin-left: 8px; }
 
+        .result-select {
+            display: flex;
+            align-items: flex-start;
+            padding: 2px 0 0 0;
+        }
+        .result-select input[type="checkbox"] {
+            width: 15px;
+            height: 15px;
+            flex: none;
+            padding: 0;
+            margin: 0;
+            cursor: pointer;
+        }
+        .bulk-toolbar {
+            position: fixed;
+            bottom: 0; left: 0; right: 0;
+            background: #111827;
+            color: #f9fafb;
+            padding: 0.65rem 2rem;
+            display: none;
+            align-items: center;
+            gap: 0.75rem;
+            z-index: 900;
+            box-shadow: 0 -4px 16px rgba(0,0,0,0.25);
+            flex-wrap: wrap;
+        }
+        .bulk-toolbar select, .bulk-toolbar input[type="text"] {
+            background: #1f2937;
+            color: #f9fafb;
+            border: 1px solid #374151;
+            border-radius: 5px;
+            padding: 0.35rem 0.6rem;
+            font-size: 0.82rem;
+            flex: none;
+        }
+        .bulk-toolbar input[type="text"] { width: 140px; }
+        .bulk-toolbar select { width: 110px; }
+        .bulk-apply-btn {
+            background: #3b82f6; color: white; border: none;
+            border-radius: 5px; padding: 0.4rem 1rem;
+            cursor: pointer; font-size: 0.85rem; font-weight: 500;
+        }
+        .bulk-apply-btn:hover { background: #2563eb; }
+        .bulk-deselect-btn {
+            background: transparent; color: #9ca3af;
+            border: 1px solid #374151; border-radius: 5px;
+            padding: 0.4rem 0.75rem; cursor: pointer; font-size: 0.82rem;
+        }
+        .bulk-deselect-btn:hover { color: #f9fafb; border-color: #6b7280; }
         @media (max-width: 1024px) {
             .modal-body {
                 flex-direction: column;
@@ -530,6 +579,7 @@
                 <button id="clearBtn" type="button" class="search-btn">Clear</button>
                 <button id="advancedToggle" type="button" class="search-btn">⚙️ Filters</button>
                 <button id="reindexBtn" type="button" class="search-btn">Re-index PDFs</button>
+                <button id="tagMgmtBtn" type="button" class="search-btn">Manage tags</button>
             </form>
                         <!-- Advanced filters (hidden by default) -->
             <div id="advancedFilters" style="display:none; margin-top:1rem; padding:1rem; background:#f9fafb; border-radius:6px; border:1px solid #e5e7eb;">
@@ -590,6 +640,27 @@
         </div>
     </div>
 
+    <!-- Bulk tag toolbar -->
+    <div id="bulkToolbar" class="bulk-toolbar">
+        <span id="bulkCount" style="font-size:0.85rem;font-weight:500;min-width:80px;"></span>
+        <select id="bulkType" title="Document type">
+            <option value="">— type —</option>
+            <option value="invoice">Invoice</option>
+            <option value="receipt">Receipt</option>
+            <option value="contract">Contract</option>
+            <option value="quote">Quote</option>
+            <option value="statement">Statement</option>
+            <option value="other">Other</option>
+        </select>
+        <input type="text" id="bulkCompany" placeholder="Company…" list="bulkCompanyList" autocomplete="off">
+        <datalist id="bulkCompanyList"></datalist>
+        <select id="bulkYear" title="Year">
+            <option value="">— year —</option>
+        </select>
+        <button class="bulk-apply-btn" onclick="applyBulkTags()">Apply to selected</button>
+        <button class="bulk-deselect-btn" onclick="deselectAll()">Deselect all</button>
+    </div>
+
     <!-- PDF Viewer Modal -->
     <div id="pdfModal" class="modal">
         <div class="modal-content">
@@ -637,6 +708,19 @@
         </div>
     </div>
 
+    <!-- Tag Management Modal -->
+    <div id="tagMgmtModal" class="modal">
+        <div class="modal-content" style="max-width:680px;height:auto;max-height:85vh;overflow-y:auto;">
+            <div class="modal-header">
+                <h2>Manage Tags</h2>
+                <button class="close-btn" onclick="closeTagMgmt()">&times;</button>
+            </div>
+            <div id="tagMgmtBody" style="padding:1.25rem;">
+                <div class="loading">Loading...</div>
+            </div>
+        </div>
+    </div>
+
     <script>
         // Initialize pdf.js worker via blob URL for WKWebView compatibility
         const _pdfjsInit = fetch('/static/pdf.worker.min.js')
@@ -663,9 +747,11 @@
                 const resp = await fetch('/companies');
                 if (!resp.ok) return;
                 const companies = await resp.json();
-                const dl = document.getElementById('companyList');
-                if (!dl) return;
-                dl.innerHTML = companies.map(c => `<option value="${escapeHtml(c)}">`).join('');
+                const opts = companies.map(c => `<option value="${escapeHtml(c)}">`).join('');
+                ['companyList', 'bulkCompanyList'].forEach(id => {
+                    const dl = document.getElementById(id);
+                    if (dl) dl.innerHTML = opts;
+                });
             } catch(e) {}
         }
         loadCompanyList();
@@ -778,6 +864,9 @@
                 const badgesHtml = (typeBadge || companyBadge || yearBadge) ? `<div class="tag-badges">${typeBadge}${companyBadge}${yearBadge}</div>` : '';
                 div.innerHTML = `
                     <div class="result-top">
+                        <label class="result-select" title="Select for bulk tagging">
+                            <input type="checkbox" class="result-checkbox" data-path="${escapeHtml(path)}">
+                        </label>
                         <div class="result-thumbnail"><div class="loading">Loading...</div></div>
                         <div class="result-content">
                             <div class="result-title">${escapeHtml(filename)}</div>
@@ -803,6 +892,8 @@
             if (!append) {
                 _allResults = [];
                 _baseQueryStr = qs;
+                _selectedPaths.clear();
+                updateBulkToolbar();
                 container.innerHTML = '<div class="loading">Searching...</div>';
                 header.style.display = 'none';
                 loadMoreBtn.style.display = 'none';
@@ -844,7 +935,169 @@
         };
 
         document.getElementById('loadMoreBtn').onclick = () => performSearch(true);
-        
+
+        // ---- Bulk tagging ----
+        let _selectedPaths = new Set();
+
+        document.getElementById('results').addEventListener('change', (e) => {
+            if (e.target.classList.contains('result-checkbox')) {
+                const path = e.target.dataset.path;
+                if (e.target.checked) _selectedPaths.add(path);
+                else _selectedPaths.delete(path);
+                updateBulkToolbar();
+            }
+        });
+
+        function updateBulkToolbar() {
+            const toolbar = document.getElementById('bulkToolbar');
+            const n = _selectedPaths.size;
+            if (n === 0) {
+                toolbar.style.display = 'none';
+            } else {
+                toolbar.style.display = 'flex';
+                document.getElementById('bulkCount').textContent = `${n} selected`;
+            }
+        }
+
+        function deselectAll() {
+            _selectedPaths.clear();
+            document.querySelectorAll('.result-checkbox').forEach(cb => cb.checked = false);
+            updateBulkToolbar();
+        }
+
+        // Populate bulk year select
+        (function() {
+            const opts = Array.from({length: 31}, (_, i) => 2030 - i)
+                .map(y => `<option value="${y}">${y}</option>`).join('');
+            const el = document.getElementById('bulkYear');
+            if (el) el.insertAdjacentHTML('beforeend', opts);
+        })();
+
+        async function applyBulkTags() {
+            const payload = {
+                paths: [..._selectedPaths],
+                type: document.getElementById('bulkType').value,
+                company: document.getElementById('bulkCompany').value.trim(),
+                year: document.getElementById('bulkYear').value,
+            };
+            const btn = document.querySelector('.bulk-apply-btn');
+            btn.disabled = true;
+            try {
+                const resp = await fetch('/bulk_tags', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                if (resp.ok) {
+                    const result = await resp.json();
+                    document.getElementById('bulkCount').textContent = `✓ Updated ${result.updated} documents`;
+                    setTimeout(deselectAll, 1500);
+                    loadCompanyList();
+                }
+            } catch(e) {
+                console.error('Bulk tag error:', e);
+            } finally {
+                btn.disabled = false;
+            }
+        }
+
+        // ---- Tag management ----
+        document.getElementById('tagMgmtBtn').onclick = openTagMgmt;
+
+        async function openTagMgmt() {
+            document.getElementById('tagMgmtModal').classList.add('show');
+            const body = document.getElementById('tagMgmtBody');
+            body.innerHTML = '<div class="loading">Loading...</div>';
+            try {
+                const resp = await fetch('/tag_values');
+                if (!resp.ok) throw new Error('failed');
+                renderTagMgmt(await resp.json());
+            } catch(e) {
+                body.innerHTML = '<div style="color:#9ca3af;padding:1rem;">Could not load tag values.</div>';
+            }
+        }
+
+        function closeTagMgmt() {
+            document.getElementById('tagMgmtModal').classList.remove('show');
+        }
+
+        function renderTagMgmt(values) {
+            const body = document.getElementById('tagMgmtBody');
+            const fields = [
+                { key: 'company', label: 'Company' },
+                { key: 'type', label: 'Document Type' },
+                { key: 'year', label: 'Year' },
+            ];
+            let html = '<p style="font-size:0.85rem;color:#646464;margin-bottom:1.25rem;">Rename a value to update it across all tagged documents.</p>';
+            let hasAny = false;
+            for (const {key, label} of fields) {
+                const vals = values[key] || {};
+                const entries = Object.entries(vals).sort((a, b) => b[1] - a[1]);
+                if (!entries.length) continue;
+                hasAny = true;
+                html += `<div style="margin-bottom:1.75rem;">
+                    <h3 style="font-size:0.8rem;text-transform:uppercase;color:#646464;letter-spacing:0.5px;margin-bottom:0.6rem;">${label}</h3>
+                    <table style="width:100%;border-collapse:collapse;font-size:0.85rem;">
+                        <thead><tr style="border-bottom:2px solid #e5e7eb;">
+                            <th style="text-align:left;padding:4px 8px;color:#374151;font-weight:500;">Current value</th>
+                            <th style="text-align:center;padding:4px 8px;color:#374151;font-weight:500;width:55px;">Docs</th>
+                            <th style="text-align:left;padding:4px 8px;color:#374151;font-weight:500;">Rename to</th>
+                            <th style="width:70px;"></th>
+                        </tr></thead>
+                        <tbody>`;
+                entries.forEach(([val, count], i) => {
+                    html += `<tr style="border-bottom:1px solid #f3f4f6;" data-mgmt-row>
+                        <td style="padding:6px 8px;font-weight:500;">${escapeHtml(val)}</td>
+                        <td style="padding:6px 8px;text-align:center;color:#9ca3af;">${count}</td>
+                        <td style="padding:6px 8px;">
+                            <input type="text" data-mgmt-field="${escapeHtml(key)}" data-mgmt-old="${escapeHtml(val)}"
+                                placeholder="${escapeHtml(val)}"
+                                style="width:100%;padding:0.3rem 0.5rem;border:1px solid #e5e7eb;border-radius:4px;font-size:0.85rem;">
+                        </td>
+                        <td style="padding:6px 8px;">
+                            <button data-mgmt-field="${escapeHtml(key)}" data-mgmt-old="${escapeHtml(val)}"
+                                class="search-btn mgmt-rename-btn" style="padding:0.3rem 0.6rem;font-size:0.8rem;">Save</button>
+                        </td>
+                    </tr>`;
+                });
+                html += `</tbody></table></div>`;
+            }
+            if (!hasAny) html = '<div style="color:#9ca3af;padding:1rem;">No tags saved yet.</div>';
+            body.innerHTML = html;
+            body.querySelectorAll('.mgmt-rename-btn').forEach(btn => {
+                btn.onclick = async () => {
+                    const field = btn.dataset.mgmtField;
+                    const oldValue = btn.dataset.mgmtOld;
+                    const row = btn.closest('tr');
+                    const input = row.querySelector('input[data-mgmt-field]');
+                    const newValue = input.value.trim();
+                    if (!newValue || newValue === oldValue) return;
+                    btn.disabled = true;
+                    btn.textContent = '…';
+                    try {
+                        const resp = await fetch('/rename_tag', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ field, old_value: oldValue, new_value: newValue })
+                        });
+                        if (resp.ok) {
+                            btn.textContent = '✓';
+                            loadCompanyList();
+                            setTimeout(() => openTagMgmt(), 800);
+                        } else {
+                            btn.textContent = '!';
+                        }
+                    } catch(e) {
+                        btn.textContent = '!';
+                    } finally {
+                        setTimeout(() => { btn.disabled = false; btn.textContent = 'Save'; }, 2000);
+                    }
+                };
+            });
+        }
+
+        // Also wire tag mgmt modal close on backdrop click (add to window.onclick)
+
         async function renderPdfThumbnail(pdfPath, container) {
             try {
                 await _pdfjsInit;
@@ -1082,13 +1335,16 @@
                 }
 
                 // Labels / tag editor
+                const autoNote = (tags.auto && !tags.type)
+                    ? `<span style="font-size:0.72rem;color:#9ca3af;font-weight:400;text-transform:none;letter-spacing:0;margin-left:6px;">auto-suggested</span>`
+                    : '';
                 const yearOpts = '<option value="">— select —</option>' +
                     Array.from({length: 31}, (_, i) => 2030 - i)
                         .map(y => `<option value="${y}">${y}</option>`).join('');
                 html += `
                 <hr style="border:none;border-top:1px solid #e5e7eb;margin:1rem 0;">
                 <div class="summary-section">
-                    <h3>Labels</h3>
+                    <h3>Labels${autoNote}</h3>
                     <div class="tag-editor">
                         <div>
                             <label>Document type</label>
@@ -1210,6 +1466,10 @@
             const modal = document.getElementById('pdfModal');
             if (event.target === modal) {
                 closePdfModal();
+            }
+            const mgmtModal = document.getElementById('tagMgmtModal');
+            if (event.target === mgmtModal) {
+                closeTagMgmt();
             }
         };
     </script>

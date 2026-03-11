@@ -416,6 +416,66 @@ def get_companies():
     return jsonify(companies)
 
 
+@app.route("/bulk_tags", methods=["POST"])
+def bulk_tags():
+    """Apply tags to multiple documents at once. Only overwrites fields that are non-empty."""
+    data = request.get_json(force=True) or {}
+    paths = data.get("paths", [])
+    if not paths:
+        return jsonify({"status": "error", "error": "no paths provided"}), 400
+    updates = {k: v for k, v in {
+        "type": data.get("type", ""),
+        "company": data.get("company", ""),
+        "year": str(data.get("year", "")),
+    }.items() if v}
+    if not updates:
+        return jsonify({"status": "error", "error": "no tag values provided"}), 400
+    tags_data = load_tags()
+    for path in paths:
+        existing = tags_data.get(path, {})
+        tags_data[path] = {**existing, **updates}
+    with open(TAGS_FILE, "w", encoding="utf-8") as f:
+        json.dump(tags_data, f, indent=2)
+    return jsonify({"status": "ok", "updated": len(paths)})
+
+
+@app.route("/tag_values")
+def tag_values():
+    """Return all unique values for type/company/year with document counts."""
+    from collections import defaultdict
+    tags_data = load_tags()
+    counts = {"type": defaultdict(int), "company": defaultdict(int), "year": defaultdict(int)}
+    for tag in tags_data.values():
+        for field in ("type", "company", "year"):
+            val = tag.get(field, "").strip()
+            if val:
+                counts[field][val] += 1
+    return jsonify({
+        field: dict(sorted(vals.items()))
+        for field, vals in counts.items()
+    })
+
+
+@app.route("/rename_tag", methods=["POST"])
+def rename_tag():
+    """Rename a tag value across all documents."""
+    data = request.get_json(force=True) or {}
+    field = data.get("field", "")
+    old_value = data.get("old_value", "").strip()
+    new_value = data.get("new_value", "").strip()
+    if field not in ("type", "company", "year") or not old_value:
+        return jsonify({"status": "error", "error": "invalid field or value"}), 400
+    tags_data = load_tags()
+    updated = 0
+    for tag in tags_data.values():
+        if tag.get(field, "").strip() == old_value:
+            tag[field] = new_value
+            updated += 1
+    with open(TAGS_FILE, "w", encoding="utf-8") as f:
+        json.dump(tags_data, f, indent=2)
+    return jsonify({"status": "ok", "updated": updated})
+
+
 @app.route("/stats")
 def stats():
     """Return index document count and last-indexed timestamp."""
