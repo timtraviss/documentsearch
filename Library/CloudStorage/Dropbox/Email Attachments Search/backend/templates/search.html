@@ -568,12 +568,26 @@
                         <input type="checkbox" id="filterModeOr" />
                         <label for="filterModeOr" style="margin-left:6px; font-size:0.85rem; color:#646464;">Match any (OR)</label>
                     </div>
+                    <div style="display:flex; align-items:center;">
+                        <input type="checkbox" id="filterUntagged" />
+                        <label for="filterUntagged" style="margin-left:6px; font-size:0.85rem; color:#646464;">Untagged only</label>
+                    </div>
                 </div>
             </div>
         <div id="resultsHeader" class="results-header" style="display:none;">
             <span class="results-count" id="resultsCount"></span>
+            <select id="sortBy" style="padding:0.4rem 0.6rem;border:1px solid #e5e7eb;border-radius:6px;font-size:0.85rem;background:#fff;color:#374151;">
+                <option value="relevance">Sort: Relevance</option>
+                <option value="date_desc">Date: Newest first</option>
+                <option value="date_asc">Date: Oldest first</option>
+                <option value="company">Company A–Z</option>
+                <option value="year_desc">Year: Newest first</option>
+            </select>
         </div>
         <div id="results" class="results-grid"></div>
+        <div style="text-align:center; margin-top:1.25rem;">
+            <button id="loadMoreBtn" type="button" class="search-btn" style="display:none; padding:0.6rem 2rem;">Load more</button>
+        </div>
     </div>
 
     <!-- PDF Viewer Modal -->
@@ -700,89 +714,136 @@
             }
         });
 
-        document.getElementById('searchForm').onsubmit = async (e) => {
-            e.preventDefault();
+        const PAGE_SIZE = 20;
+        let _allResults = [];
+        let _baseQueryStr = '';
+
+        function buildQueryStr() {
             const q = document.getElementById('q').value.trim();
             const filterCompany = document.getElementById('filterCompany').value.trim();
             const filterDate = document.getElementById('filterDate').value.trim();
             const filterAmount = document.getElementById('filterAmount').value.trim();
             const tagType = document.getElementById('filterTagType').value;
             const tagYear = document.getElementById('filterTagYear').value;
+            const orMode = document.getElementById('filterModeOr').checked;
+            const untagged = document.getElementById('filterUntagged').checked;
+            if (!q && !filterCompany && !filterDate && !filterAmount && !tagType && !tagYear && !untagged) return null;
+            let qs = `/search?q=${encodeURIComponent(q)}&limit=${PAGE_SIZE}`;
+            if (filterCompany) qs += `&company=${encodeURIComponent(filterCompany)}`;
+            if (filterDate) qs += `&date=${encodeURIComponent(filterDate)}`;
+            if (filterAmount) qs += `&amount=${encodeURIComponent(filterAmount)}`;
+            if (tagType) qs += `&tag_type=${encodeURIComponent(tagType)}`;
+            if (tagYear) qs += `&tag_year=${encodeURIComponent(tagYear)}`;
+            if (orMode) qs += `&mode=or`;
+            if (untagged) qs += `&tag_untagged=1`;
+            return qs;
+        }
 
-            if (!q && !filterCompany && !filterDate && !filterAmount && !tagType && !tagYear) return;
+        function sortResults(results) {
+            const sortBy = document.getElementById('sortBy').value;
+            const sorted = [...results];
+            switch (sortBy) {
+                case 'date_desc':
+                    return sorted.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+                case 'date_asc':
+                    return sorted.sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+                case 'company':
+                    return sorted.sort((a, b) => {
+                        const ca = (a.tags?.company || a.company || a.filename || '').toLowerCase();
+                        const cb = (b.tags?.company || b.company || b.filename || '').toLowerCase();
+                        return ca.localeCompare(cb);
+                    });
+                case 'year_desc':
+                    return sorted.sort((a, b) => (b.tags?.year || '0').localeCompare(a.tags?.year || '0'));
+                default:
+                    return sorted;
+            }
+        }
 
+        function renderResultCards(docs, append = false) {
+            const container = document.getElementById('results');
+            const q = document.getElementById('q').value;
+            if (!append) container.innerHTML = '';
+            sortResults(docs).forEach((doc) => {
+                const div = document.createElement('div');
+                div.className = 'result-card';
+                const filename = doc.filename || 'Unknown';
+                const path = doc.path || '';
+                const rawSnippet = (doc.snippet || '').substring(0, 120).replace(/\n/g, ' ');
+                const snippet = highlightText(rawSnippet, q);
+                const tags = doc.tags || {};
+                const typeBadge = tags.type ? `<span class="tag-badge tag-type">${escapeHtml(tags.type)}</span>` : '';
+                const companyBadge = tags.company ? `<span class="tag-badge tag-company">${escapeHtml(tags.company)}</span>` : '';
+                const yearBadge = tags.year ? `<span class="tag-badge tag-year">${escapeHtml(tags.year)}</span>` : '';
+                const badgesHtml = (typeBadge || companyBadge || yearBadge) ? `<div class="tag-badges">${typeBadge}${companyBadge}${yearBadge}</div>` : '';
+                div.innerHTML = `
+                    <div class="result-top">
+                        <div class="result-thumbnail"><div class="loading">Loading...</div></div>
+                        <div class="result-content">
+                            <div class="result-title">${escapeHtml(filename)}</div>
+                            ${badgesHtml}
+                            <div class="result-snippet" style="white-space:normal;">${snippet}</div>
+                        </div>
+                    </div>
+                    <div class="result-actions">
+                        <button class="btn-sm" onclick="viewPdf('${path.replace(/'/g, "\\'")}', '${filename.replace(/'/g, "\\'")}')" style="flex: 2;">View</button>
+                        <button class="btn-sm" onclick="downloadPdf('${path.replace(/'/g, "\\'")}')">Download</button>
+                    </div>`;
+                container.appendChild(div);
+                renderPdfThumbnail(path, div.querySelector('.result-thumbnail'));
+            });
+        }
+
+        async function performSearch(append = false) {
+            const qs = buildQueryStr();
+            if (!qs) return;
             const container = document.getElementById('results');
             const header = document.getElementById('resultsHeader');
-            container.innerHTML = '<div class="loading">Searching...</div>';
-            header.style.display = 'none';
-
+            const loadMoreBtn = document.getElementById('loadMoreBtn');
+            if (!append) {
+                _allResults = [];
+                _baseQueryStr = qs;
+                container.innerHTML = '<div class="loading">Searching...</div>';
+                header.style.display = 'none';
+                loadMoreBtn.style.display = 'none';
+            }
             try {
-                // Build query string with filters and mode
-                let queryStr = `/search?q=${encodeURIComponent(q)}`;
-                if (filterCompany) queryStr += `&company=${encodeURIComponent(filterCompany)}`;
-                if (filterDate) queryStr += `&date=${encodeURIComponent(filterDate)}`;
-                if (filterAmount) queryStr += `&amount=${encodeURIComponent(filterAmount)}`;
-                if (tagType) queryStr += `&tag_type=${encodeURIComponent(tagType)}`;
-                if (tagYear) queryStr += `&tag_year=${encodeURIComponent(tagYear)}`;
-                const orMode = document.getElementById('filterModeOr').checked;
-                if (orMode) {
-                    queryStr += `&mode=or`;
-                }
-                
-                const resp = await fetch(queryStr);
-                const results = await resp.json();
-                
-                container.innerHTML = '';
-                if (results.length === 0) {
+                const offset = _allResults.length;
+                const resp = await fetch(qs + `&offset=${offset}`);
+                const batch = await resp.json();
+                _allResults = _allResults.concat(batch);
+                if (_allResults.length === 0) {
                     container.innerHTML = '<div class="no-results">No results found. Try different keywords or filters.</div>';
                     header.style.display = 'none';
+                    loadMoreBtn.style.display = 'none';
                     return;
                 }
-                
-                // Show results count
                 header.style.display = 'flex';
-                document.getElementById('resultsCount').textContent = `${results.length} ${results.length === 1 ? 'result' : 'results'} found`;
-                
-                results.forEach((doc) => {
-                    const div = document.createElement('div');
-                    div.className = 'result-card';
-                    
-                    const filename = doc.filename || 'Unknown';
-                    const path = doc.path || '';
-                    const rawSnippet = (doc.snippet || '').substring(0, 120).replace(/\n/g, ' ');
-                    const snippet = highlightText(rawSnippet, document.getElementById('q').value);
-                    const tags = doc.tags || {};
-                    const typeBadge = tags.type ? `<span class="tag-badge tag-type">${escapeHtml(tags.type)}</span>` : '';
-                    const companyBadge = tags.company ? `<span class="tag-badge tag-company">${escapeHtml(tags.company)}</span>` : '';
-                    const yearBadge = tags.year ? `<span class="tag-badge tag-year">${escapeHtml(tags.year)}</span>` : '';
-                    const badgesHtml = (typeBadge || companyBadge || yearBadge) ? `<div class="tag-badges">${typeBadge}${companyBadge}${yearBadge}</div>` : '';
-
-                    div.innerHTML = `
-                        <div class="result-top">
-                            <div class="result-thumbnail">
-                                <div class="loading">Loading...</div>
-                            </div>
-                            <div class="result-content">
-                                <div class="result-title">${escapeHtml(filename)}</div>
-                                ${badgesHtml}
-                                <div class="result-snippet" style="white-space:normal;">${snippet}</div>
-                            </div>
-                        </div>
-                        <div class="result-actions">
-                            <button class="btn-sm" onclick="viewPdf('${path.replace(/'/g, "\\'")}', '${filename.replace(/'/g, "\\'")}')" style="flex: 2;">View</button>
-                            <button class="btn-sm" onclick="downloadPdf('${path.replace(/'/g, "\\'")}')">Download</button>
-                        </div>
-                    `;
-                    container.appendChild(div);
-                    
-                    // Render PDF thumbnail asynchronously
-                    renderPdfThumbnail(path, div.querySelector('.result-thumbnail'));
-                });
+                document.getElementById('resultsCount').textContent =
+                    `${_allResults.length} ${_allResults.length === 1 ? 'result' : 'results'} found`;
+                if (append) {
+                    renderResultCards(batch, true);
+                } else {
+                    renderResultCards(_allResults, false);
+                }
+                loadMoreBtn.style.display = batch.length === PAGE_SIZE ? 'inline-block' : 'none';
             } catch (err) {
-                container.innerHTML = '<div class="no-results">Error: ' + err.message + '</div>';
+                if (!append) container.innerHTML = '<div class="no-results">Error: ' + err.message + '</div>';
                 header.style.display = 'none';
             }
+        }
+
+        document.getElementById('searchForm').onsubmit = async (e) => {
+            e.preventDefault();
+            await performSearch(false);
         };
+
+        document.getElementById('sortBy').onchange = () => {
+            if (_allResults.length === 0) return;
+            renderResultCards(_allResults, false);
+        };
+
+        document.getElementById('loadMoreBtn').onclick = () => performSearch(true);
         
         async function renderPdfThumbnail(pdfPath, container) {
             try {
@@ -830,8 +891,12 @@
             document.getElementById('filterTagType').value = '';
             document.getElementById('filterTagYear').value = '';
             document.getElementById('filterModeOr').checked = false;
+            document.getElementById('filterUntagged').checked = false;
+            document.getElementById('sortBy').value = 'relevance';
             document.getElementById('results').innerHTML = '';
             document.getElementById('resultsHeader').style.display = 'none';
+            document.getElementById('loadMoreBtn').style.display = 'none';
+            _allResults = [];
         };
 
         // Re-index: open confirmation modal

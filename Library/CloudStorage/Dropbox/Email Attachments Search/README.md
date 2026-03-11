@@ -247,9 +247,9 @@ python backend/embeddings.py  # if using AI search
 ### Planned improvements
 
 #### Search quality
-- [ ] Sort results — by date (newest/oldest), company, year, or relevance
-- [ ] Untagged filter — quick toggle to show only documents with no tags
-- [ ] Increase results limit beyond 20 (pagination or "load more")
+- [x] Sort results — by date (newest/oldest), company, year, or relevance
+- [x] Untagged filter — quick toggle to show only documents with no tags
+- [x] Increase results limit beyond 20 (pagination or "load more")
 
 #### Tagging workflow
 - [ ] Auto-suggest tags — pre-fill company and year from extracted document text when opening a new document

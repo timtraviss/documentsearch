@@ -77,9 +77,17 @@ def search():
     # Tag filters (applied post-search)
     tag_type = request.args.get("tag_type", "").lower()
     tag_year = request.args.get("tag_year", "")
+    tag_untagged = request.args.get("tag_untagged", "").lower() in ("1", "true")
+
+    # Pagination
+    try:
+        limit = min(max(int(request.args.get("limit", 20)), 1), 200)
+        offset = max(int(request.args.get("offset", 0)), 0)
+    except (ValueError, TypeError):
+        limit, offset = 20, 0
 
     has_query = bool(q or filter_company or filter_date or filter_amount)
-    has_tag_filters = bool(tag_type or tag_year)
+    has_tag_filters = bool(tag_type or tag_year or tag_untagged)
 
     if not has_query and not has_tag_filters:
         return jsonify([])
@@ -92,29 +100,49 @@ def search():
 
     # Tag-only browse: no text query, iterate tags directly
     if not has_query and has_tag_filters:
-        for rel_path, tag in tags_data.items():
-            if tag_type and tag.get("type", "").lower() != tag_type:
-                continue
-            if tag_year and tag.get("year", "") != tag_year:
-                continue
-            doc = doc_index.get(rel_path)
-            if not doc:
-                continue
-            text = doc.get("text", "")
-            fname = doc.get("filename", "")
-            results.append({
-                "filename": fname,
-                "path": rel_path,
-                "snippet": text[:300],
-                "company": (tag.get("company")
-                            or extract_company(text)
-                            or extract_company_from_filename(fname)
-                            or ""),
-                "date": tag.get("year") or extract_date(text) or "",
-                "amount": extract_total_amount(text) or "",
-                "tags": tag,
-            })
-        return jsonify(results[:20])
+        if tag_untagged:
+            # Return documents with no saved tags (or all-blank tag values)
+            tagged_nonempty = {
+                k for k, v in tags_data.items()
+                if any(str(val).strip() for val in v.values())
+            }
+            for doc in documents:
+                rel_path = doc.get("relative_path", "")
+                if rel_path not in tagged_nonempty:
+                    fname = doc.get("filename", "")
+                    results.append({
+                        "filename": fname,
+                        "path": rel_path,
+                        "snippet": doc.get("text", "")[:300],
+                        "company": extract_company_from_filename(fname) or "",
+                        "date": "",
+                        "amount": "",
+                        "tags": {},
+                    })
+        else:
+            for rel_path, tag in tags_data.items():
+                if tag_type and tag.get("type", "").lower() != tag_type:
+                    continue
+                if tag_year and tag.get("year", "") != tag_year:
+                    continue
+                doc = doc_index.get(rel_path)
+                if not doc:
+                    continue
+                text = doc.get("text", "")
+                fname = doc.get("filename", "")
+                results.append({
+                    "filename": fname,
+                    "path": rel_path,
+                    "snippet": text[:300],
+                    "company": (tag.get("company")
+                                or extract_company(text)
+                                or extract_company_from_filename(fname)
+                                or ""),
+                    "date": tag.get("year") or extract_date(text) or "",
+                    "amount": extract_total_amount(text) or "",
+                    "tags": tag,
+                })
+        return jsonify(results[offset:offset + limit])
 
     # Normal search (with or without tag filters)
     if search_type == "semantic" and HAS_EMBEDDINGS:
@@ -148,10 +176,12 @@ def search():
                 continue
             if tag_year and t.get("year", "") != tag_year:
                 continue
+            if tag_untagged and any(str(v).strip() for v in t.values()):
+                continue
             filtered.append(r)
         results = filtered
 
-    return jsonify(results[:20])
+    return jsonify(results[offset:offset + limit])
 
 
 @app.route("/reindex", methods=["POST"])
@@ -337,7 +367,7 @@ def text_search(q, filter_company="", filter_date="", filter_amount="", filter_m
             "amount": amount
         })
     
-    return results[:20]
+    return results
 
 @app.route("/pdf/<path:filename>")
 def serve_pdf(filename):
