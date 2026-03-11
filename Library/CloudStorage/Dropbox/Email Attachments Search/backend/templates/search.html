@@ -172,9 +172,9 @@
         }
 
         .result-thumbnail {
-            width: 120px;
-            height: 120px;
-            min-width: 120px;
+            width: 140px;
+            height: 140px;
+            min-width: 140px;
             background: var(--surface-2);
             display: flex;
             align-items: center;
@@ -540,6 +540,76 @@
         }
         .bulk-toolbar input[type="text"] { width: 140px; }
         .bulk-toolbar select { width: 110px; }
+        /* ---- Admin dropdown menu ---- */
+        .admin-menu-item {
+            display: block; width: 100%; text-align: left;
+            padding: 0.55rem 1rem; background: none; border: none;
+            border-bottom: 1px solid var(--border); color: var(--ink);
+            font-size: 0.85rem; font-family: 'Instrument Sans', sans-serif;
+            cursor: pointer; border-radius: 0; transition: background 0.15s;
+        }
+        .admin-menu-item:last-child { border-bottom: none; }
+        .admin-menu-item:hover { background: var(--surface-2); color: var(--accent); }
+
+        /* ---- Welcome state ---- */
+        #welcomeState {
+            padding: 2.5rem 0 1rem;
+            animation: fadeUp 0.4s ease both;
+            animation-delay: 0.25s;
+        }
+        .welcome-stat-row {
+            display: flex; gap: 1rem; margin-bottom: 2rem; flex-wrap: wrap;
+        }
+        .welcome-stat {
+            flex: 1; min-width: 100px;
+            background: var(--surface); border: 1px solid var(--border);
+            border-radius: 10px; padding: 1rem 1.25rem; text-align: center;
+        }
+        .welcome-stat .num {
+            font-family: 'Playfair Display', serif; font-size: 2rem;
+            font-weight: 600; color: var(--ink); line-height: 1;
+        }
+        .welcome-stat .lbl {
+            font-size: 0.75rem; color: var(--ink-faint); margin-top: 4px;
+            text-transform: uppercase; letter-spacing: 0.5px;
+        }
+        .welcome-section-label {
+            font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.6px;
+            color: var(--ink-faint); margin-bottom: 0.6rem; font-weight: 500;
+        }
+        .welcome-chips { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 1.75rem; }
+        .welcome-chip {
+            padding: 0.35rem 0.85rem; border-radius: 20px;
+            border: 1px solid var(--border); background: var(--surface);
+            color: var(--ink-muted); font-size: 0.82rem; cursor: pointer;
+            transition: all 0.15s; font-family: 'Instrument Sans', sans-serif;
+        }
+        .welcome-chip:hover {
+            border-color: var(--accent); color: var(--accent);
+            background: var(--accent-light);
+        }
+
+        /* ---- Redesigned result card ---- */
+        .result-company {
+            font-family: 'Instrument Sans', sans-serif;
+            font-weight: 600; font-size: 1rem; color: var(--ink);
+            line-height: 1.2; margin-bottom: 2px;
+        }
+        .result-company.unknown {
+            color: var(--ink-faint); font-weight: 400; font-style: italic;
+        }
+        .result-amount {
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 0.88rem; color: var(--accent); font-weight: 500;
+            margin-bottom: 4px;
+        }
+        /* Override old title to be secondary */
+        .result-title {
+            font-family: 'IBM Plex Mono', monospace !important;
+            font-size: 0.75rem !important; color: var(--ink-faint) !important;
+            font-weight: 400 !important; margin-top: 2px;
+        }
+
         @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.5} }
         @keyframes fadeUp {
           from { opacity: 0; transform: translateY(12px); }
@@ -609,10 +679,15 @@
                 <button type="submit" style="background:var(--accent);color:#fff;">Search</button>
                 <button id="clearBtn" type="button" class="search-btn">Clear</button>
                 <button id="advancedToggle" type="button" class="search-btn">⚙️ Filters</button>
-                <button id="reindexBtn" type="button" class="search-btn">Re-index PDFs</button>
-                <span id="reindexBadge" style="display:none; font-size:0.78rem; color:#6366f1; background:#ede9fe; padding:2px 8px; border-radius:12px; vertical-align:middle; animation:pulse 1.5s infinite;">⟳ Indexing…</span>
-                <button id="tagMgmtBtn" type="button" class="search-btn">Manage tags</button>
-                <button id="statsBtn" type="button" class="search-btn">Stats</button>
+                <div style="position:relative;display:inline-flex;align-items:center;gap:0.4rem;">
+                    <button id="adminMenuBtn" type="button" class="search-btn" title="Admin tools">⚙ Tools</button>
+                    <span id="reindexBadge" style="display:none; font-size:0.78rem; color:#6366f1; background:#ede9fe; padding:2px 8px; border-radius:12px; vertical-align:middle; animation:pulse 1.5s infinite;">⟳ Indexing…</span>
+                    <div id="adminMenu" style="display:none;position:absolute;right:0;top:calc(100% + 6px);background:var(--surface);border:1px solid var(--border);border-radius:8px;box-shadow:0 6px 20px var(--shadow);z-index:200;min-width:170px;overflow:hidden;">
+                        <button id="reindexBtn" type="button" class="admin-menu-item">↺ Re-index PDFs</button>
+                        <button id="tagMgmtBtn" type="button" class="admin-menu-item">⌖ Manage tags</button>
+                        <button id="statsBtn" type="button" class="admin-menu-item">◉ Stats dashboard</button>
+                    </div>
+                </div>
             </form>
                         <!-- Advanced filters (hidden by default) -->
             <div id="advancedFilters" style="display:none; margin-top:1rem; padding:1rem; background:var(--surface-2); border-radius:6px; border:1px solid var(--border);">
@@ -670,6 +745,25 @@
                 <button id="exportCsvBtn" type="button" class="btn-sm" style="white-space:nowrap;">↓ Export CSV</button>
             </div>
         </div>
+        <!-- Welcome / empty state -->
+        <div id="welcomeState">
+            <div class="welcome-stat-row" id="welcomeStatRow"></div>
+            <div id="welcomeCompaniesWrap" style="display:none;">
+                <div class="welcome-section-label">Top companies</div>
+                <div class="welcome-chips" id="welcomeCompanyChips"></div>
+            </div>
+            <div>
+                <div class="welcome-section-label">Example searches</div>
+                <div class="welcome-chips">
+                    <span class="welcome-chip" onclick="quickSearch('invoice')">invoice</span>
+                    <span class="welcome-chip" onclick="quickSearch('receipt')">receipt</span>
+                    <span class="welcome-chip" onclick="quickSearch('2024')">2024</span>
+                    <span class="welcome-chip" onclick="quickSearch('2025')">2025</span>
+                    <span class="welcome-chip" onclick="quickSearch('unpaid')">unpaid</span>
+                </div>
+            </div>
+        </div>
+
         <div id="results" class="results-grid"></div>
         <div style="text-align:center; margin-top:1.25rem;">
             <button id="loadMoreBtn" type="button" class="search-btn" style="display:none; padding:0.6rem 2rem;">Load more</button>
@@ -809,8 +903,8 @@
         }
         loadCompanyList();
 
-        // Load and display index stats in header
-        (async function loadStats() {
+        // Load and display index stats in header + welcome state
+        async function loadStats() {
             try {
                 const resp = await fetch('/stats');
                 if (!resp.ok) return;
@@ -819,8 +913,55 @@
                     document.getElementById('statsDocCount').textContent = `${s.doc_count} documents`;
                 if (s.last_indexed)
                     document.getElementById('statsLastIndexed').textContent = `Indexed ${s.last_indexed}`;
+                // Welcome stat cards
+                const row = document.getElementById('welcomeStatRow');
+                if (row && s.doc_count != null) {
+                    row.innerHTML = `
+                        <div class="welcome-stat">
+                            <div class="num">${s.doc_count}</div>
+                            <div class="lbl">Documents indexed</div>
+                        </div>
+                        <div class="welcome-stat">
+                            <div class="num" style="font-size:1rem;font-family:'IBM Plex Mono',monospace;color:var(--ink-muted);">${s.last_indexed || '—'}</div>
+                            <div class="lbl">Last indexed</div>
+                        </div>`;
+                }
+            } catch(e) {}
+        }
+        loadStats();
+
+        // Populate welcome company chips from breakdown
+        (async function loadWelcomeCompanies() {
+            try {
+                const resp = await fetch('/stats/breakdown');
+                if (!resp.ok) return;
+                const data = await resp.json();
+                const companies = Object.keys(data.by_company || {}).slice(0, 8);
+                if (!companies.length) return;
+                const wrap = document.getElementById('welcomeCompaniesWrap');
+                const chips = document.getElementById('welcomeCompanyChips');
+                if (!wrap || !chips) return;
+                chips.innerHTML = companies.map(c =>
+                    `<span class="welcome-chip" onclick="quickSearch('${escapeHtml(c).replace(/'/g,"\\'")}')">
+                        ${escapeHtml(c)}</span>`
+                ).join('');
+                wrap.style.display = 'block';
             } catch(e) {}
         })();
+
+        function quickSearch(term) {
+            document.getElementById('q').value = term;
+            document.getElementById('searchForm').dispatchEvent(new Event('submit'));
+        }
+
+        function showWelcome() {
+            const ws = document.getElementById('welcomeState');
+            if (ws) ws.style.display = 'block';
+        }
+        function hideWelcome() {
+            const ws = document.getElementById('welcomeState');
+            if (ws) ws.style.display = 'none';
+        }
 
         // sidebar toggle
         function toggleSidebar() {
@@ -911,10 +1052,15 @@
                 const rawSnippet = (doc.snippet || '').substring(0, 120).replace(/\n/g, ' ');
                 const snippet = highlightText(rawSnippet, q);
                 const tags = doc.tags || {};
+                const company = tags.company || doc.company || '';
+                const amount = tags.amount || doc.amount || '';
                 const typeBadge = tags.type ? `<span class="tag-badge tag-type">${escapeHtml(tags.type)}</span>` : '';
-                const companyBadge = tags.company ? `<span class="tag-badge tag-company">${escapeHtml(tags.company)}</span>` : '';
                 const yearBadge = tags.year ? `<span class="tag-badge tag-year">${escapeHtml(tags.year)}</span>` : '';
-                const badgesHtml = (typeBadge || companyBadge || yearBadge) ? `<div class="tag-badges">${typeBadge}${companyBadge}${yearBadge}</div>` : '';
+                const badgesHtml = (typeBadge || yearBadge) ? `<div class="tag-badges" style="margin-bottom:4px;">${typeBadge}${yearBadge}</div>` : '';
+                const companyHtml = company
+                    ? `<div class="result-company">${escapeHtml(company)}</div>`
+                    : `<div class="result-company unknown">Unknown vendor</div>`;
+                const amountHtml = amount ? `<div class="result-amount">${escapeHtml(amount)}</div>` : '';
                 div.innerHTML = `
                     <div class="result-top">
                         <label class="result-select" title="Select for bulk tagging">
@@ -922,9 +1068,11 @@
                         </label>
                         <div class="result-thumbnail"><div class="loading">Loading...</div></div>
                         <div class="result-content">
-                            <div class="result-title">${escapeHtml(filename)}</div>
+                            ${companyHtml}
+                            ${amountHtml}
                             ${badgesHtml}
-                            <div class="result-snippet" style="white-space:normal;">${snippet}</div>
+                            <div class="result-title">${escapeHtml(filename)}</div>
+                            <div class="result-snippet" style="white-space:normal;margin-top:4px;">${snippet}</div>
                         </div>
                     </div>
                     <div class="result-actions">
@@ -947,6 +1095,7 @@
                 _baseQueryStr = qs;
                 _selectedPaths.clear();
                 updateBulkToolbar();
+                hideWelcome();
                 container.innerHTML = '<div class="loading">Searching...</div>';
                 header.style.display = 'none';
                 loadMoreBtn.style.display = 'none';
@@ -1055,7 +1204,10 @@
         }
 
         // ---- Tag management ----
-        document.getElementById('tagMgmtBtn').onclick = openTagMgmt;
+        document.getElementById('tagMgmtBtn').onclick = () => {
+            document.getElementById('adminMenu').style.display = 'none';
+            openTagMgmt();
+        };
 
         async function openTagMgmt() {
             document.getElementById('tagMgmtModal').classList.add('show');
@@ -1150,7 +1302,10 @@
         }
 
         // ---- Stats dashboard ----
-        document.getElementById('statsBtn').onclick = openStats;
+        document.getElementById('statsBtn').onclick = () => {
+            document.getElementById('adminMenu').style.display = 'none';
+            openStats();
+        };
 
         function closeStats() {
             document.getElementById('statsModal').classList.remove('show');
@@ -1291,10 +1446,24 @@
             document.getElementById('resultsHeader').style.display = 'none';
             document.getElementById('loadMoreBtn').style.display = 'none';
             _allResults = [];
+            showWelcome();
         };
+
+        // Admin menu toggle
+        document.getElementById('adminMenuBtn').onclick = (e) => {
+            e.stopPropagation();
+            const menu = document.getElementById('adminMenu');
+            menu.style.display = menu.style.display === 'none' ? 'block' : 'none';
+        };
+        document.addEventListener('click', () => {
+            const menu = document.getElementById('adminMenu');
+            if (menu) menu.style.display = 'none';
+        });
+        document.getElementById('adminMenu').addEventListener('click', (e) => e.stopPropagation());
 
         // Re-index: open confirmation modal
         document.getElementById('reindexBtn').onclick = () => {
+            document.getElementById('adminMenu').style.display = 'none';
             openReindexModal();
         };
 

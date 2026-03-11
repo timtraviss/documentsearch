@@ -273,9 +273,9 @@ python backend/embeddings.py  # if using AI search
 - [x] Page-load animation — staggered fadeUp reveal of header and search bar
 
 ##### Layout & navigation
-- [ ] Collapse admin tools — move Re-index, Manage tags, Stats behind a single ⚙ menu to reduce toolbar clutter
-- [ ] Welcome / empty state — show total docs, top companies, and example searches before the user has typed anything
-- [ ] Improve result card hierarchy — make company and amount the hero text; filename secondary; larger thumbnail
+- [x] Collapse admin tools — Re-index, Manage tags, Stats behind a single ⚙ Tools dropdown
+- [x] Welcome / empty state — doc count, last-indexed date, top company chips, and example search chips
+- [x] Improve result card hierarchy — company + amount as hero text; type/year badges; filename secondary in monospace
 
 ##### Search experience
 - [ ] Search-as-you-type — debounced (~400ms) so results appear without pressing Enter
