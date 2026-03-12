@@ -140,7 +140,7 @@ export default function App() {
             >
               <Group justify="space-between" align="flex-start">
                 <Box>
-                  <Title order={1} style={{ color: 'var(--ink)', lineHeight: 1.1 }}>
+                  <Title order={1} style={{ color: 'var(--ink)', lineHeight: 1.1, fontFamily: '"Fugaz One", cursive' }}>
                     Document Search
                   </Title>
                   <Text c="dimmed" size="sm" mt={4}>

@@ -362,6 +362,7 @@ The DB is stored in the Dropbox project folder (`backend/search.db`), giving aut
 
 ## Version History
 
+- **v0.5** — 2026-03-12 19:10 — Use Fugaz One font for "Document Search" h1 to match the app icon
 - **v0.4** — 2026-03-12 18:45 — Fix bulk tag payload (spread tag fields to top level); fix PDF modal not rendering (keep canvas always mounted so ref is valid on first load)
 - **v0.3** — 2026-03-12 18:04 — Complete React + Mantine v7 migration (Phases 1–5): TypeScript/Vite frontend, ink-on-cream editorial theme, BulkToolbar, Flask serving built SPA, updated sync_bundle.sh and CLAUDE.md
 - **v0.2** — 2026-03-12 12:15 — Fix py2app bundle DB path via `DB_PATH` env var; add `.env` sync to `sync_bundle.sh`; add version bumping and timestamp to `/ship` skill

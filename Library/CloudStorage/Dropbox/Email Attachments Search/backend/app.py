@@ -65,7 +65,7 @@ except ImportError:
     HAS_EMBEDDINGS = False
 
 REINDEX_TOKEN = os.getenv("REINDEX_TOKEN")
-APP_VERSION = "0.4"
+APP_VERSION = "0.5"
 
 # In-memory status for the background reindex thread
 reindex_status = {
