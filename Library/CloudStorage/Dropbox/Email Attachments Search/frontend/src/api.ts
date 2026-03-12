@@ -75,7 +75,7 @@ export async function bulkTags(paths: string[], tag: DocumentTags): Promise<void
   const res = await fetch('/bulk_tags', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ paths, tag }),
+    body: JSON.stringify({ paths, ...tag }),
   })
   if (!res.ok) throw new Error('Bulk tags failed')
 }

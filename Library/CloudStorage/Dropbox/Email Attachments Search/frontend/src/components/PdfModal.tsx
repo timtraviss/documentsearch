@@ -253,42 +253,41 @@ export default function PdfModal({ doc, companies, onClose, onTagsSaved }: Props
             </Box>
           )}
 
-          {!pdfLoading && !pdfError && (
-            <>
-              {/* Page controls */}
-              {numPages > 1 && (
-                <Group gap="sm">
-                  <ActionIcon
-                    variant="filled"
-                    color="teal"
-                    disabled={page <= 1}
-                    onClick={() => handlePageChange(-1)}
-                  >
-                    <IconChevronLeft size={16} />
-                  </ActionIcon>
-                  <Text size="sm" style={{ fontFamily: 'var(--mantine-font-family-monospace)' }}>
-                    Page {page} of {numPages}
-                  </Text>
-                  <ActionIcon
-                    variant="filled"
-                    color="teal"
-                    disabled={page >= numPages}
-                    onClick={() => handlePageChange(1)}
-                  >
-                    <IconChevronRight size={16} />
-                  </ActionIcon>
-                </Group>
-              )}
-              <canvas
-                ref={canvasRef}
-                style={{
-                  maxWidth: '100%',
-                  boxShadow: '0 4px 24px rgba(0,0,0,0.18)',
-                  borderRadius: 2,
-                }}
-              />
-            </>
+          {/* Page controls — only shown once loaded */}
+          {!pdfLoading && !pdfError && numPages > 1 && (
+            <Group gap="sm">
+              <ActionIcon
+                variant="filled"
+                color="teal"
+                disabled={page <= 1}
+                onClick={() => handlePageChange(-1)}
+              >
+                <IconChevronLeft size={16} />
+              </ActionIcon>
+              <Text size="sm" style={{ fontFamily: 'var(--mantine-font-family-monospace)' }}>
+                Page {page} of {numPages}
+              </Text>
+              <ActionIcon
+                variant="filled"
+                color="teal"
+                disabled={page >= numPages}
+                onClick={() => handlePageChange(1)}
+              >
+                <IconChevronRight size={16} />
+              </ActionIcon>
+            </Group>
           )}
+
+          {/* Canvas is always mounted so the ref is valid when renderPage fires */}
+          <canvas
+            ref={canvasRef}
+            style={{
+              display: pdfLoading || !!pdfError ? 'none' : 'block',
+              maxWidth: '100%',
+              boxShadow: '0 4px 24px rgba(0,0,0,0.18)',
+              borderRadius: 2,
+            }}
+          />
         </Box>
       </Modal>
 
