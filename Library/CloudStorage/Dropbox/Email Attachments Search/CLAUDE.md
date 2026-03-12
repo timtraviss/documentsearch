@@ -4,11 +4,23 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Running the app
 
-**From terminal (development):**
+**Frontend dev server (hot reload):**
+```bash
+cd frontend && npm run dev
+# UI at http://localhost:5173 — proxies API calls to Flask on port 5001
+```
+
+**Backend (Flask):**
 ```bash
 source venv/bin/activate
 python backend/app.py
-# Opens at http://localhost:5000 (auto-selects free port if 5000 is busy)
+# API at http://localhost:5001
+```
+
+**Build frontend for production / bundle:**
+```bash
+cd frontend && npm run build
+# Outputs to backend/static/ (index.html + assets/)
 ```
 
 **As macOS .app bundle:**
@@ -21,7 +33,7 @@ open "dist/Document Search.app"
 ```bash
 bash sync_bundle.sh
 ```
-This copies `app.py`, `indexer.py`, `search.html`, static assets, and `app_launcher.py` into the bundle and clears cached `.pyc` files. Always run this after edits when testing via the .app.
+This builds the React frontend (`npm run build`), then copies `app.py`, `indexer.py`, the Vite output (`backend/static/`), and `app_launcher.py` into the bundle and clears cached `.pyc` files. Always run this after edits when testing via the .app.
 
 **Full bundle rebuild (only needed when adding new Python packages):**
 ```bash
@@ -37,26 +49,40 @@ python backend/indexer.py        # full index
 ## Architecture
 
 ### Data flow
-1. `backend/indexer.py` walks `PDF_FOLDER`, extracts text via pdfminer, writes `backend/index.json` (each entry has `path`, `relative_path`, `filename`, `text`, `mtime`)
-2. `backend/app.py` loads `index.json` into the global `documents` list at startup (in-memory for the lifetime of the process)
-3. User tags are persisted to `~/Library/Application Support/Document Search/tags.json` — **outside** the bundle so rebuilds never wipe them
-4. The Flask app serves `backend/templates/search.html` which is a single-page UI making JSON API calls
+1. `backend/indexer.py` walks `PDF_FOLDER`, extracts text via pdfminer, writes to `backend/search.db` (SQLite + FTS5)
+2. `backend/app.py` loads the SQLite index on each request (no in-memory global); text search uses FTS5
+3. User tags are persisted to the same `search.db` in a `tags` table — path set via `DB_PATH` env var
+4. Flask serves `backend/static/index.html` (Vite-built React app) at `/`; API routes handle all data
+
+### Frontend stack
+- **React 18 + TypeScript** via Vite (`frontend/`)
+- **Mantine v7** — component library (AppShell, Modal, Drawer, Table, Select, etc.)
+- **Framer Motion** — page-load stagger animations, AnimatePresence
+- **pdfjs-dist** — PDF rendering in result cards and full-page viewer
+- **@tabler/icons-react** — icon set
+- **CSS variables** in `frontend/src/index.css` — `--page-bg`, `--card-bg`, `--ink`, `--border`, `--accent`
+- Fonts: **DM Serif Display** (headings), **DM Mono** (filenames/code), **DM Sans** (body) via Google Fonts
+
+### Key frontend files
+- `frontend/src/App.tsx` — root component; all state management; results grid; modal/drawer wiring
+- `frontend/src/api.ts` — typed wrappers for all Flask endpoints; exports `PAGE_SIZE = 20`
+- `frontend/src/types.ts` — TypeScript interfaces (`SearchResult`, `DocumentTags`, `SearchFilters`, etc.)
+- `frontend/src/theme.ts` — Mantine theme (primaryColor teal, fonts, ink-on-cream palette)
+- `frontend/src/components/SearchBar.tsx` — search input, advanced filters collapse, Tools menu
+- `frontend/src/components/ResultCard.tsx` — card with PDF thumbnail (pdfjs 0.5×), badges, actions
+- `frontend/src/components/PdfModal.tsx` — full PDF viewer modal + tag editor drawer
+- `frontend/src/components/BulkToolbar.tsx` — sticky bulk-tag bar (appears when docs are selected)
+- `frontend/src/components/ReindexModal.tsx` — reindex with live log streaming
+- `frontend/src/components/TagMgmt.tsx` — rename tag values across all documents
+- `frontend/src/components/StatsPanel.tsx` — stats drawer with ring progress + bar charts
+- `frontend/src/components/WelcomeState.tsx` — landing state with quick-search chips
 
 ### Key backend files
-- `backend/app.py` — Flask app; all routes; regex-based text extraction helpers (`extract_company`, `extract_date`, `extract_total_amount`, `extract_company_from_filename`); in-memory `documents` global updated after reindex
-- `backend/indexer.py` — `scan_pdfs(folder, progress_callback, existing_index)`: pass `existing_index=documents` for incremental mode (skips files with matching mtime)
+- `backend/app.py` — Flask app; all routes; serves React SPA at `/`; regex extraction helpers
+- `backend/indexer.py` — `scan_pdfs(folder, progress_callback, existing_index)`: incremental mode skips files with matching mtime
+- `backend/database.py` — SQLite/FTS5 helpers; `get_db_path()` honours `DB_PATH` env var
 - `backend/embeddings.py` — optional OpenAI FAISS semantic search; only active when `vector.faiss` exists
-- `app_launcher.py` — py2app entry point; finds a free port, starts Flask in a daemon thread, opens a pywebview window on the main thread
-
-### Key frontend (search.html)
-The entire UI is a single Jinja2 template with inline JS. Key globals:
-- `_allResults` — full result array for the current search (used by sort and load-more)
-- `_baseQueryStr` — query string of the active search (used to fetch more pages)
-- `_selectedPaths` — Set of paths for bulk tagging
-- `_pdfjsInit` — Promise that gates all PDF rendering (blob-URL worker for WKWebView compatibility)
-- `PAGE_SIZE = 20` — results per page; load-more fetches next `offset`
-
-Key functions: `performSearch(append)`, `buildQueryStr()`, `renderResultCards(docs, append)`, `sortResults(results)`, `viewPdf(path, filename)`, `renderPdfPage(pageNum)`.
+- `app_launcher.py` — py2app entry point; finds a free port, starts Flask in a daemon thread, opens a pywebview window
 
 ### API endpoints
 | Endpoint | Purpose |
@@ -73,11 +99,13 @@ Key functions: `performSearch(append)`, `buildQueryStr()`, `renderResultCards(do
 | `GET /stats/breakdown` | Counts by type, company, year |
 | `GET /export/csv` | Download CSV of matching results (same params as `/search`, no pagination) |
 | `GET /companies` | Sorted list of unique company names from tags |
+| `GET /assets/<path>` | Serve Vite-built JS/CSS assets |
 
 ### Configuration
 `.env` file (at project root and bundled into the .app):
 ```
 PDF_FOLDER=/path/to/Email Attachments
+DB_PATH=/absolute/path/to/backend/search.db   # required for bundle; optional in dev
 OPENAI_API_KEY=sk-...   # optional, enables semantic search
 REINDEX_TOKEN=...        # optional, protects /reindex endpoint
 ```
@@ -85,28 +113,24 @@ REINDEX_TOKEN=...        # optional, protects /reindex endpoint
 ### macOS bundle notes
 - py2app bundles Python + all dependencies into `dist/Document Search.app`
 - The bundle's Python is at `Contents/Resources/lib/python3.12/`
-- `sync_bundle.sh` is the fast path for source-only changes; `setup.py py2app` is needed only for new packages
+- `sync_bundle.sh` builds the frontend then syncs everything — run this for all source changes
+- `setup.py py2app` is needed only when adding new Python packages
 - macOS TCC (Full Disk Access) must be granted in System Settings for the .app to read files in `~/Library/CloudStorage/Dropbox/`
-- Tags survive rebuilds because they're stored in `~/Library/Application Support/Document Search/tags.json`
+- Tags survive rebuilds because `DB_PATH` points outside the bundle
 
 DISTILLED_AESTHETICS_PROMPT = """
 <frontend_aesthetics>
-You tend to converge toward generic, "on distribution" outputs. In frontend design, this creates what users call the "AI slop" aesthetic. Avoid this: make creative, distinctive frontends that surprise and delight. Focus on:
- 
-Typography: Choose fonts that are beautiful, unique, and interesting. Avoid generic fonts like Arial and Inter; opt instead for distinctive choices that elevate the frontend's aesthetics.
- 
-Color & Theme: Commit to a cohesive aesthetic. Use CSS variables for consistency. Dominant colors with sharp accents outperform timid, evenly-distributed palettes. Draw from IDE themes and cultural aesthetics for inspiration.
- 
-Motion: Use animations for effects and micro-interactions. Prioritize CSS-only solutions for HTML. Use Motion library for React when available. Focus on high-impact moments: one well-orchestrated page load with staggered reveals (animation-delay) creates more delight than scattered micro-interactions.
- 
-Backgrounds: Create atmosphere and depth rather than defaulting to solid colors. Layer CSS gradients, use geometric patterns, or add contextual effects that match the overall aesthetic.
- 
+This app uses Mantine v7 with a custom ink-on-cream editorial theme. When making UI changes:
+
+- **Component library**: Use Mantine components (Button, Modal, Drawer, Select, etc.) — don't reach for raw HTML elements when a Mantine component exists
+- **Palette**: CSS variables `--page-bg` (#F5F0E8), `--card-bg` (#FEFCF8), `--ink` (#1A1A2E), `--accent` (#0D7377), `--border`. Primary colour is `teal`.
+- **Typography**: DM Serif Display for headings (fontFamily: '"DM Serif Display", serif'), DM Mono for filenames/code, DM Sans for body. Avoid Inter/Roboto/Arial.
+- **Motion**: Framer Motion for page-load stagger (see App.tsx). Keep animations subtle — opacity + y-offset, 0.2–0.4s duration.
+- **Tone**: Editorial, calm, document-oriented. Not dashboard-flashy. Teal accents on warm cream.
+
 Avoid generic AI-generated aesthetics:
 - Overused font families (Inter, Roboto, Arial, system fonts)
 - Clichéd color schemes (particularly purple gradients on white backgrounds)
 - Predictable layouts and component patterns
-- Cookie-cutter design that lacks context-specific character
- 
-Interpret creatively and make unexpected choices that feel genuinely designed for the context. Vary between light and dark themes, different fonts, different aesthetics. You still tend to converge on common choices (Space Grotesk, for example) across generations. Avoid this: it is critical that you think outside the box!
 </frontend_aesthetics>
 """

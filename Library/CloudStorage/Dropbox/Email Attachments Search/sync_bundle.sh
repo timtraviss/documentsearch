@@ -1,17 +1,28 @@
 #!/bin/bash
 # Sync source changes into the existing app bundle without a full rebuild.
-# Run this after editing backend/app.py or backend/templates/*.html
+# Builds the React frontend, then copies backend + static assets into the bundle.
 
 set -e
 
 BUNDLE="dist/Document Search.app/Contents/Resources/lib/python3.12/backend"
 SRC="backend"
 
+echo "Building React frontend..."
+(cd frontend && npm run build)
+echo "  Frontend built → backend/static/"
+
 echo "Syncing source → bundle..."
 
 cp "$SRC/app.py"                  "$BUNDLE/app.py"
 cp "$SRC/indexer.py"              "$BUNDLE/indexer.py"
 cp "$SRC/database.py"             "$BUNDLE/database.py"
+
+# Sync Vite build output (index.html + assets/)
+BUNDLE_STATIC="$BUNDLE/static"
+mkdir -p "$BUNDLE_STATIC/assets"
+cp "$SRC/static/index.html"       "$BUNDLE_STATIC/index.html"
+rsync -a --delete "$SRC/static/assets/" "$BUNDLE_STATIC/assets/"
+echo "  Synced static assets."
 
 # Ensure sqlite3 stdlib package + compiled extension are present (py2app omits them)
 PYLIB="dist/Document Search.app/Contents/Resources/lib/python3.12"
@@ -27,9 +38,6 @@ if [ -n "$SQLITE_PKG" ] && [ ! -d "$PYLIB/sqlite3" ]; then
     echo "  Copied sqlite3 package into bundle."
 fi
 cp ".env"                         "dist/Document Search.app/Contents/Resources/.env"
-cp "$SRC/templates/search.html"   "$BUNDLE/templates/search.html"
-cp "$SRC/static/pdf.min.js"       "$BUNDLE/static/pdf.min.js"
-cp "$SRC/static/pdf.worker.min.js" "$BUNDLE/static/pdf.worker.min.js"
 cp "app_launcher.py"              "dist/Document Search.app/Contents/Resources/app_launcher.py"
 
 # Clear cached bytecode so Python picks up the new source

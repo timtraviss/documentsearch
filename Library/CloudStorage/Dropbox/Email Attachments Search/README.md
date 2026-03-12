@@ -271,11 +271,13 @@ python backend/embeddings.py  # if using AI search
 - [x] Typography upgrade — Playfair Display for headings, IBM Plex Mono for filenames/amounts, Instrument Sans for UI
 - [x] Atmospheric background — subtle dot-grid texture over warm parchment base
 - [x] Page-load animation — staggered fadeUp reveal of header and search bar
+- [x] Migrate UI to React + TypeScript + Mantine v7 — ink-on-cream editorial theme, DM Serif Display + DM Mono fonts, Framer Motion stagger animations
 
 ##### Layout & navigation
 - [x] Collapse admin tools — Re-index, Manage tags, Stats behind a single ⚙ Tools dropdown
 - [x] Welcome / empty state — doc count, last-indexed date, top company chips, and example search chips
 - [x] Improve result card hierarchy — company + amount as hero text; type/year badges; filename secondary in monospace
+- [x] Bulk tag toolbar — sticky bar with type/company/year fields appears when cards are selected; applies to all selected docs at once
 
 ##### Search experience
 - [ ] Search-as-you-type — debounced (~400ms) so results appear without pressing Enter
@@ -360,6 +362,7 @@ The DB is stored in the Dropbox project folder (`backend/search.db`), giving aut
 
 ## Version History
 
+- **v0.3** — 2026-03-12 18:04 — Complete React + Mantine v7 migration (Phases 1–5): TypeScript/Vite frontend, ink-on-cream editorial theme, BulkToolbar, Flask serving built SPA, updated sync_bundle.sh and CLAUDE.md
 - **v0.2** — 2026-03-12 12:15 — Fix py2app bundle DB path via `DB_PATH` env var; add `.env` sync to `sync_bundle.sh`; add version bumping and timestamp to `/ship` skill
 - **v0.1** — Initial release — SQLite + FTS5 migration replacing flat JSON files
 

@@ -9,13 +9,15 @@ import traceback
 from urllib.parse import unquote
 from datetime import datetime
 
-from flask import Flask, Response, g, render_template, request, jsonify
+from flask import Flask, Response, g, render_template, request, jsonify, send_from_directory
 from dotenv import load_dotenv
 
 load_dotenv()
 
 PDF_FOLDER = os.getenv("PDF_FOLDER")
 
+_here = os.path.dirname(os.path.abspath(__file__))
+_static = os.path.join(_here, "static")
 app = Flask(__name__)
 
 # ---------------------------------------------------------------------------
@@ -63,7 +65,7 @@ except ImportError:
     HAS_EMBEDDINGS = False
 
 REINDEX_TOKEN = os.getenv("REINDEX_TOKEN")
-APP_VERSION = "0.2"
+APP_VERSION = "0.3"
 
 # In-memory status for the background reindex thread
 reindex_status = {
@@ -299,12 +301,22 @@ def _apply_tag_filters(results, tag_type, tag_year, tag_untagged):
 
 @app.route("/")
 def home():
+    index = os.path.join(_static, "index.html")
+    if os.path.exists(index):
+        return send_from_directory(_static, "index.html")
+    # Fallback: legacy Jinja template when React hasn't been built yet
     return render_template(
         "search.html",
         has_embeddings=HAS_EMBEDDINGS,
         reindex_token_present=bool(REINDEX_TOKEN),
         version=APP_VERSION,
     )
+
+
+@app.route("/assets/<path:filename>")
+def react_assets(filename: str):
+    """Serve Vite-built JS/CSS assets."""
+    return send_from_directory(os.path.join(_static, "assets"), filename)
 
 
 @app.route("/search")
