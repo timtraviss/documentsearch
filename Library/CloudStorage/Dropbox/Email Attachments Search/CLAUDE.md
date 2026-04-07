@@ -2,6 +2,23 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Git workflow
+
+Use feature branches for all changes — never commit directly to `main`.
+
+```bash
+git checkout -b feature/short-description   # create branch
+# make changes, then:
+bash sync_bundle.sh                         # build + sync to .app
+git add <files>
+git commit -m "description"
+git push -u origin feature/short-description
+# open a PR to merge into main
+```
+
+Branch naming: `feature/` for new functionality, `fix/` for bug fixes.
+After merging, delete the branch.
+
 ## Running the app
 
 **Frontend dev server (hot reload):**
