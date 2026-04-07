@@ -320,6 +320,13 @@ def upsert_tags_bulk(conn: sqlite3.Connection,
     return len(updates)
 
 
+def delete_document(conn: sqlite3.Connection, relative_path: str) -> None:
+    """Remove a document and its tags from the index."""
+    conn.execute("DELETE FROM documents WHERE relative_path = ?", (relative_path,))
+    conn.execute("DELETE FROM tags WHERE relative_path = ?", (relative_path,))
+    conn.commit()
+
+
 def get_all_tags(conn: sqlite3.Connection) -> dict[str, dict]:
     """Return all tags as a dict keyed by relative_path.
 

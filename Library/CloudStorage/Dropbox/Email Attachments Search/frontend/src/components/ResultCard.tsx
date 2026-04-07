@@ -10,7 +10,7 @@ import {
   Stack,
   Text,
 } from '@mantine/core'
-import { IconDownload, IconEye, IconTag } from '@tabler/icons-react'
+import { IconDownload, IconEye, IconTag, IconTrash } from '@tabler/icons-react'
 import * as pdfjsLib from 'pdfjs-dist'
 import type { SearchResult } from '../types'
 import { pdfUrl } from '../api'
@@ -52,9 +52,10 @@ interface Props {
   selected: boolean
   onToggleSelect: (path: string) => void
   onView: (doc: SearchResult) => void
+  onDelete: (doc: SearchResult) => void
 }
 
-export default function ResultCard({ doc, query, selected, onToggleSelect, onView }: Props) {
+export default function ResultCard({ doc, query, selected, onToggleSelect, onView, onDelete }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const [thumbFailed, setThumbFailed] = useState(false)
 
@@ -226,6 +227,15 @@ export default function ResultCard({ doc, query, selected, onToggleSelect, onVie
           onClick={() => onView(doc)}
         >
           <IconTag size={14} />
+        </ActionIcon>
+        <ActionIcon
+          size="md"
+          variant="subtle"
+          color="red"
+          title="Move to Deleted"
+          onClick={(e) => { e.stopPropagation(); onDelete(doc) }}
+        >
+          <IconTrash size={14} />
         </ActionIcon>
       </Group>
     </Card>

@@ -104,6 +104,14 @@ export async function getReindexStatus(): Promise<ReindexStatus> {
   return res.json()
 }
 
+export async function deleteDocument(path: string): Promise<void> {
+  const res = await fetch(`/document/${encodeURIComponent(path)}`, { method: 'DELETE' })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error((err as { error?: string }).error ?? 'Delete failed')
+  }
+}
+
 export function pdfUrl(path: string): string {
   return `/pdf/${encodeURIComponent(path)}`
 }

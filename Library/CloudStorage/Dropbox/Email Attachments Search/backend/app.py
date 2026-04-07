@@ -24,6 +24,8 @@ app = Flask(__name__)
 # Database — initialise schema on startup, one connection per request via g
 # ---------------------------------------------------------------------------
 
+import shutil
+
 from backend.database import (
     init_db,
     get_connection as _get_connection,
@@ -32,6 +34,7 @@ from backend.database import (
     upsert_tag,
     get_tag,
     get_all_tags,
+    delete_document,
 )
 
 init_db()
@@ -548,6 +551,28 @@ def serve_pdf(filename):
             pass
         return jsonify({"error": str(e), "type": type(e).__name__,
                         "filepath": filepath}), 500
+
+
+@app.route("/document/<path:filename>", methods=["DELETE"])
+def delete_document_route(filename):
+    """Move a document to PDF_FOLDER/Deleted/ with a timestamp prefix, then remove from index."""
+    filename = unquote(filename)
+    if not PDF_FOLDER:
+        return jsonify({"error": "PDF_FOLDER not configured — check .env"}), 503
+    filepath = os.path.join(PDF_FOLDER, filename)
+    try:
+        deleted_dir = os.path.join(PDF_FOLDER, "Deleted")
+        os.makedirs(deleted_dir, exist_ok=True)
+        timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+        dest_name = f"{timestamp}_{os.path.basename(filename)}"
+        shutil.move(filepath, os.path.join(deleted_dir, dest_name))
+    except FileNotFoundError:
+        pass  # already gone — still clean up the index
+    except PermissionError:
+        return jsonify({"error": "permission_denied"}), 403
+    conn = get_db()
+    delete_document(conn, filename)
+    return jsonify({"status": "ok"})
 
 
 @app.route("/companies")

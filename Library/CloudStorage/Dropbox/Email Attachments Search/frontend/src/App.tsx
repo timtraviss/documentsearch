@@ -7,6 +7,7 @@ import {
   Container,
   Divider,
   Group,
+  Modal,
   SimpleGrid,
   Stack,
   Text,
@@ -23,6 +24,7 @@ import TagMgmt from './components/TagMgmt'
 import StatsPanel from './components/StatsPanel'
 import BulkToolbar from './components/BulkToolbar'
 import {
+  deleteDocument,
   exportCsv,
   getCompanies,
   getStats,
@@ -53,6 +55,8 @@ export default function App() {
 
   const [selectedPaths, setSelectedPaths] = useState<Set<string>>(new Set())
   const [viewingDoc, setViewingDoc] = useState<SearchResult | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<SearchResult | null>(null)
+  const [deleteLoading, setDeleteLoading] = useState(false)
   const [reindexOpen, setReindexOpen] = useState(false)
   const [tagMgmtOpen, setTagMgmtOpen] = useState(false)
   const [statsOpen, setStatsOpen] = useState(false)
@@ -117,6 +121,27 @@ export default function App() {
   }
 
   const handleView = (doc: SearchResult) => setViewingDoc(doc)
+
+  const handleDeleteConfirm = async () => {
+    if (!deleteTarget) return
+    setDeleteLoading(true)
+    try {
+      await deleteDocument(deleteTarget.path)
+      setResults((prev) => prev.filter((r) => r.path !== deleteTarget.path))
+      setSelectedPaths((prev) => {
+        const next = new Set(prev)
+        next.delete(deleteTarget.path)
+        return next
+      })
+      notifications.show({ color: 'teal', message: `Moved "${deleteTarget.filename}" to Deleted folder` })
+      setDeleteTarget(null)
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : 'Delete failed'
+      notifications.show({ color: 'red', message: msg })
+    } finally {
+      setDeleteLoading(false)
+    }
+  }
 
   const handleTagsSaved = (path: string, tags: DocumentTags) => {
     // Update the result in the list so badges/company reflect the save immediately
@@ -234,6 +259,7 @@ export default function App() {
                           selected={selectedPaths.has(doc.path)}
                           onToggleSelect={toggleSelect}
                           onView={handleView}
+                          onDelete={setDeleteTarget}
                         />
                       </motion.div>
                     ))}
@@ -298,6 +324,29 @@ export default function App() {
         opened={statsOpen}
         onClose={() => setStatsOpen(false)}
       />
+
+      <Modal
+        opened={!!deleteTarget}
+        onClose={() => setDeleteTarget(null)}
+        title="Move to Deleted?"
+        centered
+        size="sm"
+      >
+        <Text size="sm" c="dimmed" mb="md">
+          <Text span fw={600} c="var(--ink)">{deleteTarget?.filename}</Text>{' '}
+          will be moved to the{' '}
+          <Text span ff="monospace">Deleted/</Text>{' '}
+          folder in Dropbox.
+        </Text>
+        <Group justify="flex-end">
+          <Button variant="subtle" onClick={() => setDeleteTarget(null)}>
+            Cancel
+          </Button>
+          <Button color="red" loading={deleteLoading} onClick={handleDeleteConfirm}>
+            Delete
+          </Button>
+        </Group>
+      </Modal>
     </AppShell>
   )
 }
