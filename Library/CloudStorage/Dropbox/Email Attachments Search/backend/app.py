@@ -528,20 +528,30 @@ def save_doc_tags(filename):
     return jsonify({"status": "ok"})
 
 
+def _safe_path(base: str, filename: str):
+    """Return resolved filepath if it stays within base, else None."""
+    resolved = os.path.abspath(os.path.join(base, filename))
+    if not resolved.startswith(os.path.abspath(base) + os.sep):
+        return None
+    return resolved
+
+
 @app.route("/pdf/<path:filename>")
 def serve_pdf(filename):
     """Serve a PDF file inline."""
     filename = unquote(filename)
     if not PDF_FOLDER:
         return jsonify({"error": "PDF_FOLDER not configured — check .env"}), 503
-    filepath = os.path.join(PDF_FOLDER, filename)
+    filepath = _safe_path(PDF_FOLDER, filename)
+    if filepath is None:
+        return jsonify({"error": "invalid path"}), 400
     try:
         with open(filepath, "rb") as f:
             data = f.read()
         return Response(data, mimetype="application/pdf",
                         headers={"Content-Disposition": "inline"})
     except FileNotFoundError:
-        return jsonify({"error": f"File not found: {filepath}"}), 404
+        return jsonify({"error": "file not found"}), 404
     except PermissionError:
         return jsonify({
             "error": "permission_denied",
@@ -549,7 +559,6 @@ def serve_pdf(filename):
                 "macOS has blocked access to this file. Grant Full Disk Access to "
                 "Document Search in System Settings → Privacy & Security → Full Disk Access."
             ),
-            "filepath": filepath,
         }), 403
     except Exception as e:
         try:
@@ -560,8 +569,7 @@ def serve_pdf(filename):
                 lf.write("---\n")
         except Exception:
             pass
-        return jsonify({"error": str(e), "type": type(e).__name__,
-                        "filepath": filepath}), 500
+        return jsonify({"error": str(e), "type": type(e).__name__}), 500
 
 
 @app.route("/document/<path:filename>", methods=["DELETE"])
@@ -570,7 +578,9 @@ def delete_document_route(filename):
     filename = unquote(filename)
     if not PDF_FOLDER:
         return jsonify({"error": "PDF_FOLDER not configured — check .env"}), 503
-    filepath = os.path.join(PDF_FOLDER, filename)
+    filepath = _safe_path(PDF_FOLDER, filename)
+    if filepath is None:
+        return jsonify({"error": "invalid path"}), 400
     try:
         deleted_dir = os.path.join(PDF_FOLDER, "Deleted")
         os.makedirs(deleted_dir, exist_ok=True)
