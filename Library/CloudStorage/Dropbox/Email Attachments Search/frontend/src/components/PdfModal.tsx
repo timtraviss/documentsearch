@@ -53,9 +53,11 @@ const YEAR_OPTIONS = [
 
 function formatAmount(raw: string): string {
   if (!raw) return ''
+  const nzd = /NZ\$|NZD/i.test(raw)
   const num = parseFloat(raw.replace(/[^0-9.]/g, ''))
   if (isNaN(num)) return raw
-  return `$${num.toFixed(2)}`
+  const prefix = nzd ? 'NZ$' : '$'
+  return `${prefix}${num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 }
 
 interface Props {
