@@ -192,6 +192,7 @@ export default function App() {
               <SearchBar
                 filters={filters}
                 tagYears={tagYears}
+                companies={companies}
                 resultCount={total}
                 isIndexing={isIndexing}
                 onSearch={handleSearch}

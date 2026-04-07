@@ -42,6 +42,7 @@ const SORT_OPTIONS = [
 interface Props {
   filters: SearchFilters
   tagYears: string[]
+  companies: string[]
   resultCount: number | null
   isIndexing: boolean
   onSearch: (filters: SearchFilters) => void
@@ -55,6 +56,7 @@ interface Props {
 export default function SearchBar({
   filters,
   tagYears,
+  companies,
   resultCount,
   isIndexing,
   onSearch,
@@ -177,12 +179,16 @@ export default function SearchBar({
           }}
         >
           <SimpleGrid cols={{ base: 1, sm: 2, md: 3 }} spacing="sm">
-            <TextInput
+            <Select
               label="Company / Vendor"
-              placeholder="e.g. Acme Corp"
-              value={local.company}
-              onChange={(e) => set('company', e.currentTarget.value)}
+              placeholder="All companies"
+              data={companies}
+              value={local.company || null}
+              onChange={(v) => set('company', v ?? '')}
+              searchable
+              clearable
               size="sm"
+              nothingFoundMessage="No matching company"
             />
             <TextInput
               label="Year or Date"

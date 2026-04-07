@@ -107,9 +107,11 @@ def text_search(conn, q, filter_company="", filter_date="",
                 SELECT d.filename,
                        d.relative_path,
                        d.text,
-                       snippet(documents_fts, 1, '', '', '...', 20) AS fts_snippet
+                       snippet(documents_fts, 1, '', '', '...', 20) AS fts_snippet,
+                       COALESCE(t.company, '') AS tagged_company
                 FROM documents_fts
                 JOIN documents d ON d.id = documents_fts.rowid
+                LEFT JOIN tags t ON t.relative_path = d.relative_path
                 WHERE documents_fts MATCH ?
                 ORDER BY rank
                 """,
@@ -120,33 +122,42 @@ def text_search(conn, q, filter_company="", filter_date="",
             pattern = f"%{q.lower()}%"
             rows = conn.execute(
                 """
-                SELECT filename, relative_path, text,
-                       substr(text, 1, 300) AS fts_snippet
-                FROM documents
-                WHERE lower(text || ' ' || filename) LIKE ?
+                SELECT d.filename, d.relative_path, d.text,
+                       substr(d.text, 1, 300) AS fts_snippet,
+                       COALESCE(t.company, '') AS tagged_company
+                FROM documents d
+                LEFT JOIN tags t ON t.relative_path = d.relative_path
+                WHERE lower(d.text || ' ' || d.filename) LIKE ?
                 """,
                 (pattern,),
             ).fetchall()
     else:
         rows = conn.execute(
             """
-            SELECT filename, relative_path, text,
-                   substr(text, 1, 300) AS fts_snippet
-            FROM documents
+            SELECT d.filename, d.relative_path, d.text,
+                   substr(d.text, 1, 300) AS fts_snippet,
+                   COALESCE(t.company, '') AS tagged_company
+            FROM documents d
+            LEFT JOIN tags t ON t.relative_path = d.relative_path
             """
         ).fetchall()
 
     results = []
     for row in rows:
         text_content = row["text"]
-        company = extract_company(text_content) or ""
+        tagged_company = row["tagged_company"] or ""
+        company = tagged_company or extract_company(text_content) or ""
         date = extract_date(text_content) or ""
         amount = extract_total_amount(text_content) or ""
 
         pass_company = pass_date = pass_amount = True
 
         if filter_company:
-            pass_company = filter_company in company.lower()
+            # Check tagged company first, then fall back to regex-extracted
+            pass_company = (
+                filter_company in tagged_company.lower()
+                or filter_company in (extract_company(text_content) or "").lower()
+            )
 
         if filter_date:
             if len(filter_date) == 4 and filter_date.isdigit():
