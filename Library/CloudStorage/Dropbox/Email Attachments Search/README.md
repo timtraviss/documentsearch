@@ -362,6 +362,7 @@ The DB is stored in the Dropbox project folder (`backend/search.db`), giving aut
 
 ## Version History
 
+- **v0.6** — 2026-04-22 — Delete document feature (moves files to `Deleted/` folder with timestamp prefix); fix company filter to match tagged companies and replace text input with dropdown; fix amount formatting to include comma separators (e.g. $1,000.00); fix path traversal on `/pdf` and `/document` DELETE routes
 - **v0.5** — 2026-03-12 19:10 — Use Fugaz One font for "Document Search" h1 to match the app icon
 - **v0.4** — 2026-03-12 18:45 — Fix bulk tag payload (spread tag fields to top level); fix PDF modal not rendering (keep canvas always mounted so ref is valid on first load)
 - **v0.3** — 2026-03-12 18:04 — Complete React + Mantine v7 migration (Phases 1–5): TypeScript/Vite frontend, ink-on-cream editorial theme, BulkToolbar, Flask serving built SPA, updated sync_bundle.sh and CLAUDE.md
