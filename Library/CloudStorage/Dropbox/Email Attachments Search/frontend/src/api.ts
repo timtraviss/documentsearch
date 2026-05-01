@@ -1,4 +1,4 @@
-import type { SearchFilters, SearchResponse, DocumentTags, Stats, TagValues, ReindexStatus, StatsBreakdown } from './types'
+import type { SearchFilters, SearchResponse, DocumentTags, Stats, TagValues, ReindexStatus, FilePdfsStatus, StatsBreakdown } from './types'
 
 const PAGE_SIZE = 20
 
@@ -101,6 +101,21 @@ export async function startReindex(incremental: boolean): Promise<void> {
 export async function getReindexStatus(): Promise<ReindexStatus> {
   const res = await fetch('/reindex/status')
   if (!res.ok) throw new Error('Reindex status failed')
+  return res.json()
+}
+
+export async function startFilePdfs(dryRun = false): Promise<void> {
+  const res = await fetch('/file-pdfs', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ dry_run: dryRun }),
+  })
+  if (!res.ok) throw new Error('File PDFs failed')
+}
+
+export async function getFilePdfsStatus(): Promise<FilePdfsStatus> {
+  const res = await fetch('/file-pdfs/status')
+  if (!res.ok) throw new Error('File PDFs status failed')
   return res.json()
 }
 

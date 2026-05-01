@@ -89,6 +89,14 @@ reindex_status = {
     "obsidian": None,
 }
 
+file_status = {
+    "running": False,
+    "logs": [],
+    "filed": 0,
+    "skipped": 0,
+    "error": None,
+}
+
 # ---------------------------------------------------------------------------
 # Search helpers
 # ---------------------------------------------------------------------------
@@ -516,6 +524,61 @@ def reindex_status_api():
         "skipped": reindex_status.get("skipped", 0),
         "error": reindex_status.get("error"),
         "obsidian": reindex_status.get("obsidian"),
+    })
+
+
+@app.route("/file-pdfs", methods=["POST"])
+def file_pdfs():
+    if file_status["running"]:
+        return jsonify({"status": "error", "error": "already running"}), 409
+
+    data = request.get_json(silent=True) or {}
+    dry_run = bool(data.get("dry_run", False))
+
+    def _log(msg):
+        file_status["logs"].append(msg)
+
+    def worker():
+        try:
+            file_status["running"] = True
+            file_status["logs"] = []
+            file_status["filed"] = 0
+            file_status["skipped"] = 0
+            file_status["error"] = None
+
+            folder = PDF_FOLDER or os.getenv("PDF_FOLDER")
+            if not folder or not os.path.isdir(folder):
+                file_status["error"] = "PDF_FOLDER not configured or not found"
+                _log(file_status["error"])
+                return
+
+            from backend.filer import process_workspace
+            from pathlib import Path
+
+            _log(f"Scanning {folder} for loose PDFs{' (dry run)' if dry_run else ''}...")
+            results = process_workspace(Path(folder), dry_run=dry_run, progress_cb=_log)
+            file_status["filed"] = len(results["filed"])
+            file_status["skipped"] = (
+                len(results["skipped_not_invoice"]) + len(results["skipped_unidentified"])
+            )
+        except Exception as e:
+            file_status["error"] = str(e)
+            _log(f"Error: {e}")
+        finally:
+            file_status["running"] = False
+
+    threading.Thread(target=worker, daemon=True).start()
+    return jsonify({"status": "ok"})
+
+
+@app.route("/file-pdfs/status")
+def file_pdfs_status():
+    return jsonify({
+        "running": file_status.get("running", False),
+        "logs": file_status.get("logs", [])[-200:],
+        "filed": file_status.get("filed", 0),
+        "skipped": file_status.get("skipped", 0),
+        "error": file_status.get("error"),
     })
 
 

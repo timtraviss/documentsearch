@@ -20,6 +20,7 @@ import ResultCard from './components/ResultCard'
 import WelcomeState from './components/WelcomeState'
 import PdfModal from './components/PdfModal'
 import ReindexModal from './components/ReindexModal'
+import FilePdfsModal from './components/FilePdfsModal'
 import TagMgmt from './components/TagMgmt'
 import StatsPanel from './components/StatsPanel'
 import BulkToolbar from './components/BulkToolbar'
@@ -58,6 +59,7 @@ export default function App() {
   const [deleteTarget, setDeleteTarget] = useState<SearchResult | null>(null)
   const [deleteLoading, setDeleteLoading] = useState(false)
   const [reindexOpen, setReindexOpen] = useState(false)
+  const [filePdfsOpen, setFilePdfsOpen] = useState(false)
   const [tagMgmtOpen, setTagMgmtOpen] = useState(false)
   const [statsOpen, setStatsOpen] = useState(false)
   const activeFiltersRef = useRef<SearchFilters>(DEFAULT_FILTERS)
@@ -199,6 +201,7 @@ export default function App() {
                 onClear={handleClear}
                 onExportCsv={() => exportCsv(filters)}
                 onOpenReindex={() => setReindexOpen(true)}
+                onOpenFilePdfs={() => setFilePdfsOpen(true)}
                 onOpenTagMgmt={() => setTagMgmtOpen(true)}
                 onOpenStats={() => setStatsOpen(true)}
               />
@@ -309,6 +312,14 @@ export default function App() {
           getStats().then(setStats).catch(() => {})
           getCompanies().then(setCompanies).catch(() => {})
           getTagValues().then((tv) => setTagYears(Object.keys(tv.year).sort().reverse())).catch(() => {})
+        }}
+      />
+
+      <FilePdfsModal
+        opened={filePdfsOpen}
+        onClose={() => setFilePdfsOpen(false)}
+        onComplete={() => {
+          getStats().then(setStats).catch(() => {})
         }}
       />
 

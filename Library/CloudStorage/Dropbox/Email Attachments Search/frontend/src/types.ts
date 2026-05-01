@@ -35,6 +35,14 @@ export interface TagValues {
   year: Record<string, number>
 }
 
+export interface FilePdfsStatus {
+  running: boolean
+  logs: string[]
+  filed: number
+  skipped: number
+  error: string | null
+}
+
 export interface ReindexStatus {
   running: boolean
   logs: string[]

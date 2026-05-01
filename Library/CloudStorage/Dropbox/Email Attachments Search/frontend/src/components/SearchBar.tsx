@@ -13,6 +13,7 @@ import {
 import {
   IconAdjustments,
   IconChartBar,
+  IconFolderSymlink,
   IconRefresh,
   IconSearch,
   IconTag,
@@ -51,6 +52,7 @@ interface Props {
   onOpenReindex: () => void
   onOpenTagMgmt: () => void
   onOpenStats: () => void
+  onOpenFilePdfs: () => void
 }
 
 export default function SearchBar({
@@ -65,6 +67,7 @@ export default function SearchBar({
   onOpenReindex,
   onOpenTagMgmt,
   onOpenStats,
+  onOpenFilePdfs,
 }: Props) {
   const [showFilters, setShowFilters] = useState(false)
   const [local, setLocal] = useState<SearchFilters>(filters)
@@ -154,9 +157,13 @@ export default function SearchBar({
             </Button>
           </Menu.Target>
           <Menu.Dropdown>
+            <Menu.Item leftSection={<IconFolderSymlink size={14} />} onClick={onOpenFilePdfs}>
+              File loose PDFs
+            </Menu.Item>
             <Menu.Item leftSection={<IconRefresh size={14} />} onClick={onOpenReindex}>
               Re-index PDFs
             </Menu.Item>
+            <Menu.Divider />
             <Menu.Item leftSection={<IconTag size={14} />} onClick={onOpenTagMgmt}>
               Manage tags
             </Menu.Item>
