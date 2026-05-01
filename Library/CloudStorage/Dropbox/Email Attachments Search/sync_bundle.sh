@@ -16,6 +16,10 @@ echo "Syncing source → bundle..."
 cp "$SRC/app.py"                  "$BUNDLE/app.py"
 cp "$SRC/indexer.py"              "$BUNDLE/indexer.py"
 cp "$SRC/database.py"             "$BUNDLE/database.py"
+cp "$SRC/extraction.py"           "$BUNDLE/extraction.py"
+cp "$SRC/obsidian.py"             "$BUNDLE/obsidian.py"
+cp "$SRC/obsidian_claude.py"      "$BUNDLE/obsidian_claude.py"
+cp "$SRC/filer.py"                "$BUNDLE/filer.py"
 
 # Sync Vite build output (index.html + assets/)
 BUNDLE_STATIC="$BUNDLE/static"
@@ -43,6 +47,10 @@ cp "app_launcher.py"              "dist/Document Search.app/Contents/Resources/a
 # Clear cached bytecode so Python picks up the new source
 rm -f "$BUNDLE/__pycache__/app"*.pyc \
       "$BUNDLE/__pycache__/indexer"*.pyc \
-      "$BUNDLE/__pycache__/database"*.pyc
+      "$BUNDLE/__pycache__/database"*.pyc \
+      "$BUNDLE/__pycache__/extraction"*.pyc \
+      "$BUNDLE/__pycache__/obsidian"*.pyc \
+      "$BUNDLE/__pycache__/obsidian_claude"*.pyc \
+      "$BUNDLE/__pycache__/filer"*.pyc
 
 echo "Done. Relaunch the app to see changes."
