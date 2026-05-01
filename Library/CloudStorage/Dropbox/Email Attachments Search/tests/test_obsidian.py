@@ -170,7 +170,7 @@ def test_export_creates_file(tmp_path):
     wrote, dest = export_to_obsidian(doc, str(tmp_path))
     assert wrote is True
     assert os.path.exists(dest)
-    assert dest.endswith("2026-mercury-energy.md")
+    assert dest.endswith("2026-04-15-mercury-energy.md")
 
 
 def test_export_creates_year_subfolder(tmp_path):

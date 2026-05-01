@@ -179,7 +179,7 @@ def export_to_obsidian(
     year = metadata.get("year") or (date[:4] if date != "unknown" and date[:4].isdigit() else "unknown")
     slug = _vendor_slug(metadata.get("vendor", ""))
 
-    md_filename = f"{year}-{slug}.md"
+    md_filename = f"{date}-{slug}.md"
     target_dir = os.path.join(vault_path, "Bills", year)
     target_path = os.path.join(target_dir, md_filename)
 
