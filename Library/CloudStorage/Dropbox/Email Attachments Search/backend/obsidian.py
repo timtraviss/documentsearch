@@ -97,7 +97,7 @@ def extract_metadata_regex(text: str, filename: str) -> dict:
 
 def _yaml_str(value: str) -> str:
     """Return value as a safely double-quoted YAML scalar."""
-    escaped = value.replace("\\", "\\\\").replace('"', '\\"')
+    escaped = str(value).replace("\\", "\\\\").replace('"', '\\"')
     return f'"{escaped}"'
 
 
