@@ -161,6 +161,9 @@ Email Attachments Search/
 |----------|----------|-------------|
 | `OPENAI_API_KEY` | ❌ No | OpenAI API key for semantic search (get from [openai.com](https://platform.openai.com/api-keys)) |
 | `PDF_FOLDER` | ✅ Yes | Path to your Email Attachments folder |
+| `OBSIDIAN_VAULT` | ❌ No | Path to your Obsidian vault root — enables sidecar export on re-index |
+| `OBSIDIAN_EXPORT_MODE` | ❌ No | `regex` (default) or `claude` — extraction method for sidecar metadata |
+| `ANTHROPIC_API_KEY` | ❌ No | Required only when `OBSIDIAN_EXPORT_MODE=claude` |
 
 ## Troubleshooting
 
@@ -263,6 +266,8 @@ python backend/embeddings.py  # if using AI search
 #### Export / reporting
 - [x] CSV export — export current search results with tags to a spreadsheet
 - [x] Stats dashboard — breakdown of documents by company, type, and year
+- [x] Obsidian sidecar export — on re-index, writes a `Bills/<year>/YYYY-MM-DD-vendor.md` note per bill into your Obsidian vault; YAML frontmatter includes vendor, date, amount, GST, invoice number, and a `file://` link back to the PDF; result shown as badges in the ReindexModal
+- [x] File loose PDFs — Tools → "File loose PDFs" scans the root of your PDF folder and moves unorganised invoices into the correct company subfolders; dry-run mode previews moves without applying them
 
 #### UI/UX redesign
 
@@ -362,6 +367,7 @@ The DB is stored in the Dropbox project folder (`backend/search.db`), giving aut
 
 ## Version History
 
+- **v0.7** — 2026-05-02 — Obsidian sidecar export (writes `Bills/<year>/YYYY-MM-DD-vendor.md` on re-index with YAML frontmatter + extracted text; regex or Claude extraction mode; result badges in ReindexModal); File Loose PDFs tool (Tools menu → scans PDF folder root and moves unorganised invoices into company subfolders; dry-run mode)
 - **v0.6** — 2026-04-22 — Delete document feature (moves files to `Deleted/` folder with timestamp prefix); fix company filter to match tagged companies and replace text input with dropdown; fix amount formatting to include comma separators (e.g. $1,000.00); fix path traversal on `/pdf` and `/document` DELETE routes
 - **v0.5** — 2026-03-12 19:10 — Use Fugaz One font for "Document Search" h1 to match the app icon
 - **v0.4** — 2026-03-12 18:45 — Fix bulk tag payload (spread tag fields to top level); fix PDF modal not rendering (keep canvas always mounted so ref is valid on first load)
