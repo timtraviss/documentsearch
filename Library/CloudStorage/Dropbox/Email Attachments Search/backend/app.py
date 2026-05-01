@@ -86,6 +86,7 @@ reindex_status = {
     "count": 0,
     "skipped": 0,
     "error": None,
+    "obsidian": None,
 }
 
 # ---------------------------------------------------------------------------
@@ -431,6 +432,7 @@ def reindex():
             reindex_status["count"] = 0
             reindex_status["skipped"] = 0
             reindex_status["error"] = None
+            reindex_status["obsidian"] = None
 
             mode = "incremental" if incremental else "full"
             _log(f"Starting {mode} reindex...")
@@ -485,6 +487,7 @@ def reindex():
                             skipped_count += 1
                     except Exception as e:
                         _log(f"Sidecar error ({doc.get('filename', '?')}): {e}")
+                reindex_status["obsidian"] = {"wrote": wrote_count, "skipped": skipped_count}
                 _log(f"Sidecars: {wrote_count} written, {skipped_count} already existed")
             elif obsidian_vault:
                 _log(f"OBSIDIAN_VAULT not found at {obsidian_vault} — skipping export")
@@ -512,6 +515,7 @@ def reindex_status_api():
         "count": reindex_status.get("count", 0),
         "skipped": reindex_status.get("skipped", 0),
         "error": reindex_status.get("error"),
+        "obsidian": reindex_status.get("obsidian"),
     })
 
 

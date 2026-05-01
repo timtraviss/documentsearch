@@ -41,6 +41,7 @@ export interface ReindexStatus {
   count: number
   skipped: number
   error: string | null
+  obsidian: { wrote: number; skipped: number } | null
 }
 
 export interface StatsBreakdown {

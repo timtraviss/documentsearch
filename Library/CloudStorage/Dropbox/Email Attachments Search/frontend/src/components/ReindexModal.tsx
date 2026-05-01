@@ -8,6 +8,7 @@ import {
   ScrollArea,
   Stack,
   Text,
+  Badge,
 } from '@mantine/core'
 import { notifications } from '@mantine/notifications'
 import { IconRefresh } from '@tabler/icons-react'
@@ -24,6 +25,7 @@ export default function ReindexModal({ opened, onClose, onComplete }: Props) {
   const [running, setRunning] = useState(false)
   const [logs, setLogs] = useState<string[]>([])
   const [done, setDone] = useState(false)
+  const [obsidian, setObsidian] = useState<{ wrote: number; skipped: number } | null>(null)
   const logRef = useRef<HTMLDivElement>(null)
   const pollingRef = useRef(false)
 
@@ -37,6 +39,7 @@ export default function ReindexModal({ opened, onClose, onComplete }: Props) {
     if (!opened) return
     setLogs([])
     setDone(false)
+    setObsidian(null)
     getReindexStatus().then((s) => {
       if (s.running) {
         setRunning(true)
@@ -62,6 +65,7 @@ export default function ReindexModal({ opened, onClose, onComplete }: Props) {
           pollingRef.current = false
           setRunning(false)
           setDone(true)
+          if (s.obsidian) setObsidian(s.obsidian)
           if (s.error) {
             setLogs((prev) => [...prev, `Error: ${s.error}`])
           } else {
@@ -85,6 +89,7 @@ export default function ReindexModal({ opened, onClose, onComplete }: Props) {
   const handleStart = async () => {
     setLogs([])
     setDone(false)
+    setObsidian(null)
     setRunning(true)
     try {
       await startReindex(incremental)
@@ -145,6 +150,16 @@ export default function ReindexModal({ opened, onClose, onComplete }: Props) {
             {done ? 'Close' : running ? 'Run in background' : 'Cancel'}
           </Button>
         </Group>
+
+        {done && obsidian && (
+          <Group gap="xs">
+            <Text size="xs" c="dimmed" style={{ fontFamily: 'var(--mantine-font-family-monospace)' }}>
+              Obsidian:
+            </Text>
+            <Badge color="teal" variant="light" size="sm">{obsidian.wrote} written</Badge>
+            <Badge color="gray" variant="light" size="sm">{obsidian.skipped} skipped</Badge>
+          </Group>
+        )}
 
         {logs.length > 0 && (
           <ScrollArea
