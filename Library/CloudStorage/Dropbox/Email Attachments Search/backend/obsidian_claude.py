@@ -4,6 +4,8 @@ import anthropic
 
 from backend.obsidian import extract_metadata_regex
 
+_MAX_TEXT_CHARS = 3000
+
 _SYSTEM_PROMPT = """You extract structured metadata from utility bill text.
 Return ONLY a JSON object with these exact keys:
   vendor, date (YYYY-MM-DD), amount_nzd (numeric string, no $),
@@ -24,7 +26,7 @@ def extract_metadata_claude(text: str, filename: str) -> dict:
 
     try:
         client = anthropic.Anthropic(api_key=api_key)
-        truncated = text[:3000] if len(text) > 3000 else text
+        truncated = text[:_MAX_TEXT_CHARS]
         response = client.messages.create(
             model="claude-haiku-4-5-20251001",
             max_tokens=512,
@@ -46,5 +48,6 @@ def extract_metadata_claude(text: str, filename: str) -> dict:
         date = metadata.get("date", "")
         metadata["year"] = date[:4] if len(date) >= 4 and date[:4].isdigit() else ""
         return metadata
-    except Exception:
+    except Exception as e:
+        print(f"[obsidian_claude] Claude extraction failed ({filename}): {e!r}", file=__import__('sys').stderr)
         return extract_metadata_regex(text, filename)

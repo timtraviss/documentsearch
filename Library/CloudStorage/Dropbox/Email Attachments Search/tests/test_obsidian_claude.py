@@ -72,3 +72,15 @@ def test_extract_metadata_claude_falls_back_when_no_api_key(monkeypatch):
     # No key → falls back to regex, still returns a dict
     assert isinstance(result, dict)
     assert "vendor" in result
+
+
+@patch("backend.obsidian_claude.anthropic.Anthropic")
+def test_extract_metadata_claude_strips_markdown_fences(mock_anthropic_class):
+    mock_client = MagicMock()
+    mock_anthropic_class.return_value = mock_client
+    fenced = f"```json\n{MOCK_RESPONSE_JSON}\n```"
+    mock_client.messages.create.return_value = MagicMock(
+        content=[MagicMock(text=fenced)]
+    )
+    result = extract_metadata_claude(BILL_TEXT, "Mercury_April_2026.pdf")
+    assert result["vendor"] == "Mercury Energy"
