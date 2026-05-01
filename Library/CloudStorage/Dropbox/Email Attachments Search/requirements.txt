@@ -4,3 +4,4 @@ pdfminer.six
 faiss-cpu
 openai
 requests
+anthropic
