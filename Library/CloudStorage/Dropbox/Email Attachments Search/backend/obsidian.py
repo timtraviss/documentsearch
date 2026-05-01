@@ -93,3 +93,104 @@ def extract_metadata_regex(text: str, filename: str) -> dict:
         "category": "",
         "due_date": "",
     }
+
+
+def render_sidecar(metadata: dict, text: str, file_uri: str) -> str:
+    vendor = metadata.get("vendor", "Unknown")
+    date = metadata.get("date", "")
+    year = metadata.get("year", "")
+    amount = metadata.get("amount_nzd", "")
+    gst = metadata.get("gst_nzd", "")
+    invoice_number = metadata.get("invoice_number", "")
+    category = metadata.get("category", "")
+    due_date = metadata.get("due_date", "")
+
+    tags = ["bill", _vendor_slug(vendor)]
+    if category:
+        tags.append(category)
+    if year:
+        tags.append(year)
+    tags_str = "[" + ", ".join(tags) + "]"
+
+    try:
+        amount_display = f"${float(amount):,.2f}" if amount else ""
+        gst_display = f"${float(gst):,.2f}" if gst else ""
+    except ValueError:
+        amount_display = amount
+        gst_display = gst
+
+    lines = [
+        "---",
+        "type: bill",
+        f"vendor: {vendor}",
+        f"date: {date}",
+        f"amount_nzd: {amount}",
+        f"gst_nzd: {gst}",
+        f"invoice_number: {invoice_number}",
+        f"category: {category}",
+        f"due_date: {due_date}",
+        "paid: false",
+        f'file_uri: "{file_uri}"',
+        f"tags: {tags_str}",
+        "---",
+        "",
+        f"# {vendor}",
+        "",
+    ]
+
+    if amount_display:
+        gst_suffix = f" (incl. {gst_display} GST)" if gst_display else ""
+        lines.append(f"**Amount:** {amount_display}{gst_suffix}")
+    if due_date:
+        lines.append(f"**Due:** {due_date}")
+    if invoice_number:
+        lines.append(f"**Invoice:** {invoice_number}")
+
+    lines.append(f"\n[Open original PDF]({file_uri})")
+
+    if text.strip():
+        lines.extend(["", "## Extracted text", "", text.strip()])
+
+    lines.append("")
+    return "\n".join(lines)
+
+
+def export_to_obsidian(
+    doc: dict,
+    vault_path: str,
+    mode: str = "regex",
+) -> tuple[bool, str]:
+    """Write Bills/<year>/<date>-<vendor-slug>.md to vault_path.
+
+    Returns (True, path) on write, (False, path) if already exists.
+    mode='claude' delegates extraction to extract_metadata_claude (lazy import).
+    """
+    text = doc.get("text", "")
+    filename = doc.get("filename", "")
+    absolute_path = doc.get("path", "")
+
+    if mode == "claude":
+        from backend.obsidian_claude import extract_metadata_claude
+        metadata = extract_metadata_claude(text, filename)
+    else:
+        metadata = extract_metadata_regex(text, filename)
+
+    date = metadata.get("date") or "unknown"
+    year = metadata.get("year") or (date[:4] if date != "unknown" and date[:4].isdigit() else "unknown")
+    slug = _vendor_slug(metadata.get("vendor", ""))
+
+    md_filename = f"{year}-{slug}.md"
+    target_dir = os.path.join(vault_path, "Bills", year)
+    target_path = os.path.join(target_dir, md_filename)
+
+    if os.path.exists(target_path):
+        return False, target_path
+
+    file_uri = _build_file_uri(absolute_path) if absolute_path else ""
+    content = render_sidecar(metadata, text, file_uri)
+
+    os.makedirs(target_dir, exist_ok=True)
+    with open(target_path, "w", encoding="utf-8") as f:
+        f.write(content)
+
+    return True, target_path

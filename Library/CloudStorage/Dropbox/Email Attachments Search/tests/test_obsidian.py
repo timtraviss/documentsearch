@@ -5,6 +5,8 @@ from backend.obsidian import (
     _build_file_uri,
     _parse_date,
     extract_metadata_regex,
+    render_sidecar,
+    export_to_obsidian,
 )
 
 BILL_TEXT = """Mercury Energy
@@ -109,3 +111,97 @@ def test_extract_metadata_regex_empty_text():
     assert meta["vendor"] == "Unknown"
     assert meta["date"] == ""
     assert meta["amount_nzd"] == ""
+
+
+FULL_METADATA = {
+    "vendor": "Mercury Energy",
+    "date": "2026-04-15",
+    "year": "2026",
+    "amount_nzd": "187.45",
+    "gst_nzd": "24.45",
+    "invoice_number": "INV-29384756",
+    "category": "",
+    "due_date": "",
+}
+
+
+# --- render_sidecar ---
+
+def test_render_sidecar_contains_frontmatter():
+    content = render_sidecar(FULL_METADATA, "some text", "file:///path/bill.pdf")
+    assert content.startswith("---\n")
+    assert "type: bill" in content
+    assert "vendor: Mercury Energy" in content
+    assert "amount_nzd: 187.45" in content
+
+
+def test_render_sidecar_contains_body():
+    content = render_sidecar(FULL_METADATA, "some text", "file:///path/bill.pdf")
+    assert "# Mercury Energy" in content
+    assert "**Amount:** $187.45" in content
+    assert "[Open original PDF]" in content
+
+
+def test_render_sidecar_includes_extracted_text():
+    content = render_sidecar(FULL_METADATA, "raw bill text here", "file:///x.pdf")
+    assert "## Extracted text" in content
+    assert "raw bill text here" in content
+
+
+def test_render_sidecar_skips_extracted_text_when_empty():
+    content = render_sidecar(FULL_METADATA, "", "file:///x.pdf")
+    assert "## Extracted text" not in content
+
+
+def test_render_sidecar_tags_include_vendor_and_year():
+    content = render_sidecar(FULL_METADATA, "", "file:///x.pdf")
+    assert "mercury-energy" in content
+    assert "2026" in content
+
+
+# --- export_to_obsidian ---
+
+def test_export_creates_file(tmp_path):
+    doc = {
+        "path": "/Dropbox/Email Attachments/Mercury_April_2026.pdf",
+        "filename": "Mercury_April_2026.pdf",
+        "text": BILL_TEXT,
+    }
+    wrote, dest = export_to_obsidian(doc, str(tmp_path))
+    assert wrote is True
+    assert os.path.exists(dest)
+    assert dest.endswith("2026-mercury-energy.md")
+
+
+def test_export_creates_year_subfolder(tmp_path):
+    doc = {
+        "path": "/Dropbox/Email Attachments/Mercury_April_2026.pdf",
+        "filename": "Mercury_April_2026.pdf",
+        "text": BILL_TEXT,
+    }
+    _, dest = export_to_obsidian(doc, str(tmp_path))
+    assert os.path.join("Bills", "2026") in dest
+
+
+def test_export_is_idempotent(tmp_path):
+    doc = {
+        "path": "/Dropbox/Email Attachments/Mercury_April_2026.pdf",
+        "filename": "Mercury_April_2026.pdf",
+        "text": BILL_TEXT,
+    }
+    wrote1, dest1 = export_to_obsidian(doc, str(tmp_path))
+    wrote2, dest2 = export_to_obsidian(doc, str(tmp_path))
+    assert wrote1 is True
+    assert wrote2 is False  # already exists — skip
+    assert dest1 == dest2
+
+
+def test_export_handles_empty_text(tmp_path):
+    doc = {
+        "path": "/Dropbox/Email Attachments/unknown.pdf",
+        "filename": "unknown.pdf",
+        "text": "",
+    }
+    wrote, dest = export_to_obsidian(doc, str(tmp_path))
+    assert wrote is True
+    assert os.path.exists(dest)
