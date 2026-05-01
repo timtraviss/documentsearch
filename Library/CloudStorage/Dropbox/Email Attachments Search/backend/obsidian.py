@@ -137,7 +137,7 @@ def render_sidecar(metadata: dict, text: str, file_uri: str) -> str:
         f"category: {_yaml_str(category)}",
         f"due_date: {_yaml_str(due_date)}",
         "paid: false",
-        f'file_uri: "{file_uri}"',
+        f"file_uri: {_yaml_str(file_uri)}",
         f"tags: {tags_str}",
         "---",
         "",
