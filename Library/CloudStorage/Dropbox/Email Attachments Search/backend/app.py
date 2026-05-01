@@ -488,6 +488,8 @@ def reindex():
                 _log(f"Sidecars: {wrote_count} written, {skipped_count} already existed")
             elif obsidian_vault:
                 _log(f"OBSIDIAN_VAULT not found at {obsidian_vault} — skipping export")
+            else:
+                _log("OBSIDIAN_VAULT not set — skipping sidecar export")
 
         except Exception as e:
             reindex_status["error"] = str(e)
