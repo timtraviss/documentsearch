@@ -35,7 +35,8 @@ def test_extract_company_from_filename():
 
 def test_extract_company_from_filename_strips_noise():
     result = extract_company_from_filename("invoice_2026_04_15.pdf")
-    # Should strip out most noise; may have date fragments depending on noise filter
+    # The noise regex strips 4-digit years and invoice/date keywords, but not
+    # 1-2 digit fragments like "04" or "15". Result may be short date fragments.
     assert result is None or len(result.split()) <= 2
 
 

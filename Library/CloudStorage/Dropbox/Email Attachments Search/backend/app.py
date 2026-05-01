@@ -37,6 +37,15 @@ from backend.database import (
     delete_document,
 )
 
+from backend.extraction import (
+    extract_company_from_filename,
+    extract_company,
+    extract_date,
+    normalise_amount,
+    extract_total_amount,
+    extract_invoice_number,
+)
+
 init_db()
 _DB_PATH = get_db_path()
 
@@ -838,18 +847,6 @@ def get_summary(filename):
         return jsonify({"error": str(e)}), 500
 
 
-# ---------------------------------------------------------------------------
-# Extraction helpers
-# ---------------------------------------------------------------------------
-
-from backend.extraction import (
-    extract_company_from_filename,
-    extract_company,
-    extract_date,
-    normalise_amount,
-    extract_total_amount,
-    extract_invoice_number,
-)
 
 
 # ---------------------------------------------------------------------------
