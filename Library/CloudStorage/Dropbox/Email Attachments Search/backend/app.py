@@ -468,6 +468,27 @@ def reindex():
             reindex_status["count"] = len(docs)
             _log("Reindex complete")
 
+            # --- Obsidian sidecar export ---
+            obsidian_vault = os.getenv("OBSIDIAN_VAULT", "").strip()
+            export_mode = os.getenv("OBSIDIAN_EXPORT_MODE", "regex").strip()
+            if obsidian_vault and os.path.isdir(obsidian_vault):
+                from backend.obsidian import export_to_obsidian
+                wrote_count = 0
+                skipped_count = 0
+                _log(f"Exporting sidecars to {obsidian_vault} (mode={export_mode})...")
+                for doc in docs:
+                    try:
+                        wrote, dest = export_to_obsidian(doc, obsidian_vault, mode=export_mode)
+                        if wrote:
+                            wrote_count += 1
+                        else:
+                            skipped_count += 1
+                    except Exception as e:
+                        _log(f"Sidecar error ({doc.get('filename', '?')}): {e}")
+                _log(f"Sidecars: {wrote_count} written, {skipped_count} already existed")
+            elif obsidian_vault:
+                _log(f"OBSIDIAN_VAULT not found at {obsidian_vault} — skipping export")
+
         except Exception as e:
             reindex_status["error"] = str(e)
             _log(f"Error: {e}")
