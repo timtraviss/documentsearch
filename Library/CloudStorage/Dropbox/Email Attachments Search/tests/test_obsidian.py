@@ -131,7 +131,7 @@ def test_render_sidecar_contains_frontmatter():
     content = render_sidecar(FULL_METADATA, "some text", "file:///path/bill.pdf")
     assert content.startswith("---\n")
     assert "type: bill" in content
-    assert "vendor: Mercury Energy" in content
+    assert 'vendor: "Mercury Energy"' in content
     assert "amount_nzd: 187.45" in content
 
 
@@ -205,3 +205,13 @@ def test_export_handles_empty_text(tmp_path):
     wrote, dest = export_to_obsidian(doc, str(tmp_path))
     assert wrote is True
     assert os.path.exists(dest)
+
+
+def test_render_sidecar_vendor_with_colon_is_valid_yaml():
+    import yaml
+    meta = {**FULL_METADATA, "vendor": "Vector: Lines NZ"}
+    content = render_sidecar(meta, "", "file:///x.pdf")
+    # Extract frontmatter between the two --- delimiters
+    parts = content.split("---")
+    frontmatter = yaml.safe_load(parts[1])
+    assert frontmatter["vendor"] == "Vector: Lines NZ"

@@ -95,7 +95,14 @@ def extract_metadata_regex(text: str, filename: str) -> dict:
     }
 
 
+def _yaml_str(value: str) -> str:
+    """Return value as a safely double-quoted YAML scalar."""
+    escaped = value.replace("\\", "\\\\").replace('"', '\\"')
+    return f'"{escaped}"'
+
+
 def render_sidecar(metadata: dict, text: str, file_uri: str) -> str:
+    """Return a UTF-8 Markdown string with YAML frontmatter for an Obsidian bill note."""
     vendor = metadata.get("vendor", "Unknown")
     date = metadata.get("date", "")
     year = metadata.get("year", "")
@@ -105,11 +112,11 @@ def render_sidecar(metadata: dict, text: str, file_uri: str) -> str:
     category = metadata.get("category", "")
     due_date = metadata.get("due_date", "")
 
-    tags = ["bill", _vendor_slug(vendor)]
+    tags = ['"bill"', f'"{_vendor_slug(vendor)}"']
     if category:
-        tags.append(category)
+        tags.append(f'"{category}"')
     if year:
-        tags.append(year)
+        tags.append(f'"{year}"')
     tags_str = "[" + ", ".join(tags) + "]"
 
     try:
@@ -122,13 +129,13 @@ def render_sidecar(metadata: dict, text: str, file_uri: str) -> str:
     lines = [
         "---",
         "type: bill",
-        f"vendor: {vendor}",
-        f"date: {date}",
+        f"vendor: {_yaml_str(vendor)}",
+        f"date: {_yaml_str(date)}",
         f"amount_nzd: {amount}",
         f"gst_nzd: {gst}",
-        f"invoice_number: {invoice_number}",
-        f"category: {category}",
-        f"due_date: {due_date}",
+        f"invoice_number: {_yaml_str(invoice_number)}",
+        f"category: {_yaml_str(category)}",
+        f"due_date: {_yaml_str(due_date)}",
         "paid: false",
         f'file_uri: "{file_uri}"',
         f"tags: {tags_str}",
