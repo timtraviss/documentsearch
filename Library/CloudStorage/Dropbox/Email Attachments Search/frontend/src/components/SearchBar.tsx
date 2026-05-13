@@ -6,6 +6,7 @@ import {
   Collapse,
   Group,
   Menu,
+  SegmentedControl,
   Select,
   SimpleGrid,
   TextInput,
@@ -20,7 +21,7 @@ import {
   IconTools,
   IconX,
 } from '@tabler/icons-react'
-import type { SearchFilters } from '../types'
+import type { AppMode, SearchFilters } from '../types'
 
 const DOC_TYPES = [
   { value: '', label: 'All types' },
@@ -46,6 +47,8 @@ interface Props {
   companies: string[]
   resultCount: number | null
   isIndexing: boolean
+  appMode: AppMode
+  onModeChange: (mode: AppMode) => void
   onSearch: (filters: SearchFilters) => void
   onClear: () => void
   onExportCsv: () => void
@@ -61,6 +64,8 @@ export default function SearchBar({
   companies,
   resultCount,
   isIndexing,
+  appMode,
+  onModeChange,
   onSearch,
   onClear,
   onExportCsv,
@@ -96,7 +101,21 @@ export default function SearchBar({
   ]
 
   return (
-    <Box component="form" onSubmit={handleSubmit}>
+    <Box>
+      <SegmentedControl
+        value={appMode}
+        onChange={(v) => onModeChange(v as AppMode)}
+        data={[
+          { value: 'search', label: 'Search documents' },
+          { value: 'ask', label: 'Ask AI' },
+        ]}
+        mb="sm"
+        color="teal"
+        styles={{ root: { background: 'var(--card-bg)', border: '1px solid var(--border)' } }}
+      />
+
+      {appMode === 'search' && (
+      <Box component="form" onSubmit={handleSubmit}>
       {/* Main search row */}
       <Group gap="xs" wrap="nowrap">
         <TextInput
@@ -271,6 +290,8 @@ export default function SearchBar({
             </Button>
           </Group>
         </Group>
+      )}
+      </Box>
       )}
     </Box>
   )
