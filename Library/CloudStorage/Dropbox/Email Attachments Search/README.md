@@ -1,14 +1,14 @@
 
 # Email Attachments Search
 
-An AI-powered web application to search and quickly locate PDF invoices in your `Email Attachments` folder. The app provides both keyword-based and semantic AI search, with direct links and previews.
+An AI-powered web application to search and quickly locate PDF invoices in your `Email Attachments` folder. The app provides keyword search, an Ask AI conversational mode powered by Claude, and direct PDF previews.
 
 ## Features
 
-✨ **Dual Search Modes**
-- **Text Search**: Fast keyword matching (always available)
-- **AND/OR Filter Mode**: When using advanced filters (company, date, amount) you can toggle between matching all criteria or any criteria via the checkbox in the UI
-- **Semantic AI Search**: Understanding query intent and content meaning (requires OpenAI API key)
+✨ **Three Ways to Find Documents**
+- **Text Search**: Fast keyword matching with filters (company, date, amount, type, year) — always available
+- **AND/OR Filter Mode**: Toggle between matching all criteria or any criteria via the checkbox in advanced filters
+- **Ask AI mode**: Conversational question-answering powered by Claude — ask natural-language questions about your documents, get synthesised answers with source document cards you can click to open the PDF. Requires OpenAI API key (embeddings) and Anthropic API key (answers).
 
 📎 **Document Management**
 - Automatic PDF scanning and indexing
@@ -246,6 +246,8 @@ python backend/embeddings.py  # if using AI search
 - [x] Tag system: Type, Company, Year badges on result cards
 - [x] Document count and last-indexed date in header
 - [x] Re-index with live progress log
+- [x] Ask AI mode — conversational RAG powered by Claude; chunked FAISS embeddings; source document cards below answer; earlier messages collapse to clickable badges; follow-up questions retain conversation history
+- [x] Rebuild Embeddings — Tools → Re-index → Semantic Search section; background thread; live progress log streaming per-document progress
 
 ### Planned improvements
 
@@ -367,6 +369,7 @@ The DB is stored in the Dropbox project folder (`backend/search.db`), giving aut
 
 ## Version History
 
+- **v0.8** — 2026-05-14 — Ask AI conversational mode: chunked FAISS embeddings (1600-char chunks, 200-char overlap, loaded from SQLite), `/ask` endpoint using Claude `claude-sonnet-4-6` for synthesis, `AskPanel` component with chat history + source document cards + follow-up support, Search/Ask mode toggle in SearchBar, Rebuild Embeddings section in ReindexModal with live log streaming
 - **v0.7** — 2026-05-02 — Obsidian sidecar export (writes `Bills/<year>/YYYY-MM-DD-vendor.md` on re-index with YAML frontmatter + extracted text; regex or Claude extraction mode; result badges in ReindexModal); File Loose PDFs tool (Tools menu → scans PDF folder root and moves unorganised invoices into company subfolders; dry-run mode)
 - **v0.6** — 2026-04-22 — Delete document feature (moves files to `Deleted/` folder with timestamp prefix); fix company filter to match tagged companies and replace text input with dropdown; fix amount formatting to include comma separators (e.g. $1,000.00); fix path traversal on `/pdf` and `/document` DELETE routes
 - **v0.5** — 2026-03-12 19:10 — Use Fugaz One font for "Document Search" h1 to match the app icon
