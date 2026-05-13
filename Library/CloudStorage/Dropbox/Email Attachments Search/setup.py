@@ -31,6 +31,9 @@ OPTIONS = {
         'cffi',
         'webview',
         'anthropic',
+        'numpy',
+        'faiss',
+        'openai',
     ],
     'includes': [
         'backend.app',
@@ -50,7 +53,6 @@ OPTIONS = {
     ],
     'excludes': [
         'matplotlib',
-        'numpy',
         'scipy',
         'pandas',
         'pytest',
