@@ -1,4 +1,4 @@
-import type { SearchFilters, SearchResponse, DocumentTags, Stats, TagValues, ReindexStatus, FilePdfsStatus, StatsBreakdown } from './types'
+import type { SearchFilters, SearchResponse, DocumentTags, Stats, TagValues, ReindexStatus, FilePdfsStatus, StatsBreakdown, AskMessage, AskResponse, RebuildEmbeddingsStatus } from './types'
 
 const PAGE_SIZE = 20
 
@@ -129,4 +129,31 @@ export async function deleteDocument(path: string): Promise<void> {
 
 export function pdfUrl(path: string): string {
   return `/pdf/${encodeURIComponent(path)}`
+}
+
+export async function ask(query: string, messages: AskMessage[]): Promise<AskResponse> {
+  const res = await fetch('/ask', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ query, messages }),
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    return { error: (err as { error?: string }).error ?? `Request failed: ${res.status}` }
+  }
+  return res.json()
+}
+
+export async function startRebuildEmbeddings(): Promise<void> {
+  const res = await fetch('/rebuild-embeddings', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+  })
+  if (!res.ok) throw new Error('Rebuild embeddings failed')
+}
+
+export async function getRebuildEmbeddingsStatus(): Promise<RebuildEmbeddingsStatus> {
+  const res = await fetch('/rebuild-embeddings/status')
+  if (!res.ok) throw new Error('Rebuild embeddings status failed')
+  return res.json()
 }
