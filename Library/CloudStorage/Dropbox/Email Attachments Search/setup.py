@@ -30,6 +30,7 @@ OPTIONS = {
         'charset_normalizer',
         'cffi',
         'webview',
+        'anthropic',
     ],
     'includes': [
         'backend.app',
