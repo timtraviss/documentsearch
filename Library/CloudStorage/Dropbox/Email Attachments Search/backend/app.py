@@ -634,7 +634,10 @@ def rebuild_embeddings_route():
             rebuild_status["error"] = None
             _log("Starting embedding rebuild...")
 
-            from embeddings import create_vector_db
+            try:
+                from embeddings import create_vector_db
+            except ImportError:
+                from backend.embeddings import create_vector_db
 
             def progress_cb(filename: str, idx: int, total: int) -> None:
                 _log(f"Embedding ({idx}/{total}): {filename}")
