@@ -69,12 +69,13 @@ def close_db(exc):
 # ---------------------------------------------------------------------------
 
 try:
-    from embeddings import search as semantic_search
+    from embeddings import search as semantic_search, search_chunks
     HAS_EMBEDDINGS = os.path.exists(
         os.path.join(os.path.dirname(__file__), "vector.faiss")
     )
 except ImportError:
     HAS_EMBEDDINGS = False
+    search_chunks = None
 
 REINDEX_TOKEN = os.getenv("REINDEX_TOKEN")
 APP_VERSION = "0.5"
@@ -411,6 +412,88 @@ def search():
         results = _apply_tag_filters(results, tag_type, tag_year, tag_untagged)
 
     return jsonify(results[offset:offset + limit])
+
+
+@app.route("/ask", methods=["POST"])
+def ask():
+    """Conversational question-answering over indexed PDFs using Claude."""
+    data = request.get_json(force=True) or {}
+    query = (data.get("query") or "").strip()
+    messages = data.get("messages") or []
+
+    if not query:
+        return jsonify({"error": "query is required"}), 400
+
+    if not HAS_EMBEDDINGS:
+        return jsonify({
+            "error": "Embeddings not built. Rebuild embeddings from Tools → Re-index."
+        }), 503
+
+    anthropic_key = os.getenv("ANTHROPIC_API_KEY", "").strip()
+    if not anthropic_key:
+        return jsonify({"error": "ANTHROPIC_API_KEY not set in .env"}), 503
+
+    try:
+        chunks = search_chunks(query, top_k=6)
+    except Exception as e:
+        return jsonify({"error": f"Embedding search failed: {e}"}), 500
+
+    if not chunks:
+        return jsonify({
+            "answer": "I couldn't find any relevant document excerpts for that question.",
+            "sources": [],
+        })
+
+    # Build context string from chunks
+    context_parts = [
+        f"[Source: {c['filename']}]\n{c['snippet']}" for c in chunks
+    ]
+    context = "\n---\n".join(context_parts)
+
+    # Deduplicate sources list (one entry per PDF path)
+    seen_paths: set[str] = set()
+    sources = []
+    for c in chunks:
+        if c["path"] not in seen_paths:
+            seen_paths.add(c["path"])
+            sources.append({
+                "filename": c["filename"],
+                "path": c["path"],
+                "snippet": c["snippet"],
+            })
+
+    # Build Anthropic messages — history + new user turn with context
+    anthropic_messages = []
+    for msg in messages:
+        role = msg.get("role")
+        content = msg.get("content", "")
+        if role in ("user", "assistant") and content:
+            anthropic_messages.append({"role": role, "content": content})
+
+    user_content = (
+        f"Here are the relevant document excerpts:\n---\n{context}\n---\n\n"
+        f"Question: {query}"
+    )
+    anthropic_messages.append({"role": "user", "content": user_content})
+
+    try:
+        import anthropic as anthropic_sdk
+        ant_client = anthropic_sdk.Anthropic(api_key=anthropic_key)
+        response = ant_client.messages.create(
+            model="claude-sonnet-4-6",
+            max_tokens=1024,
+            system=(
+                "You are a document assistant. Answer questions based only on the "
+                "document excerpts provided. Cite documents by filename when relevant. "
+                "If the answer is not in the provided excerpts, say so clearly."
+            ),
+            messages=anthropic_messages,
+        )
+        answer = response.content[0].text
+    except Exception as e:
+        return jsonify({"error": f"AI service unavailable: {e}"}), 500
+
+    return jsonify({"answer": answer, "sources": sources})
 
 
 @app.route("/reindex", methods=["POST"])
