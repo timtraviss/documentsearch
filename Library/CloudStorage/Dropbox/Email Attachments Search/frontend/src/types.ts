@@ -60,6 +60,32 @@ export interface StatsBreakdown {
 
 export type SortKey = 'relevance' | 'date_desc' | 'date_asc' | 'company' | 'year'
 export type SearchMode = 'and' | 'or'
+export type AppMode = 'search' | 'ask'
+
+export interface AskSource {
+  filename: string
+  path: string
+  snippet: string
+}
+
+export interface AskMessage {
+  role: 'user' | 'assistant'
+  content: string
+  sources?: AskSource[]
+}
+
+export interface AskResponse {
+  answer?: string
+  sources?: AskSource[]
+  error?: string
+}
+
+export interface RebuildEmbeddingsStatus {
+  running: boolean
+  logs: string[]
+  count: number
+  error: string | null
+}
 
 export interface SearchFilters {
   q: string
