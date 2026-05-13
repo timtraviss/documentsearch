@@ -98,6 +98,13 @@ file_status = {
     "error": None,
 }
 
+rebuild_status: dict = {
+    "running": False,
+    "logs": [],
+    "count": 0,
+    "error": None,
+}
+
 # ---------------------------------------------------------------------------
 # Search helpers
 # ---------------------------------------------------------------------------
@@ -607,6 +614,51 @@ def reindex_status_api():
         "skipped": reindex_status.get("skipped", 0),
         "error": reindex_status.get("error"),
         "obsidian": reindex_status.get("obsidian"),
+    })
+
+
+@app.route("/rebuild-embeddings", methods=["POST"])
+def rebuild_embeddings_route():
+    """Start a background job to re-embed all documents into vector.faiss."""
+    if rebuild_status["running"]:
+        return jsonify({"status": "error", "error": "already running"}), 409
+
+    def _log(msg: str) -> None:
+        rebuild_status["logs"].append(msg)
+
+    def worker() -> None:
+        try:
+            rebuild_status["running"] = True
+            rebuild_status["logs"] = []
+            rebuild_status["count"] = 0
+            rebuild_status["error"] = None
+            _log("Starting embedding rebuild...")
+
+            from embeddings import create_vector_db
+
+            def progress_cb(filename: str, idx: int, total: int) -> None:
+                _log(f"Embedding ({idx}/{total}): {filename}")
+
+            count = create_vector_db(progress_callback=progress_cb)
+            rebuild_status["count"] = count
+            _log(f"Done. {count} chunks embedded.")
+        except Exception as e:
+            rebuild_status["error"] = str(e)
+            _log(f"Error: {e}")
+        finally:
+            rebuild_status["running"] = False
+
+    threading.Thread(target=worker, daemon=True).start()
+    return jsonify({"status": "ok"})
+
+
+@app.route("/rebuild-embeddings/status")
+def rebuild_embeddings_status_api():
+    return jsonify({
+        "running": rebuild_status.get("running", False),
+        "logs": rebuild_status.get("logs", [])[-200:],
+        "count": rebuild_status.get("count", 0),
+        "error": rebuild_status.get("error"),
     })
 
 

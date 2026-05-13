@@ -107,3 +107,33 @@ def test_ask_passes_conversation_history(client):
     assert messages_sent[0]["content"] == "First question"
     assert messages_sent[1]["role"] == "assistant"
     assert messages_sent[-1]["role"] == "user"
+
+
+def test_rebuild_embeddings_starts(client):
+    import backend.app as app_module
+    app_module.rebuild_status["running"] = False
+    res = client.post("/rebuild-embeddings", content_type="application/json")
+    assert res.status_code == 200
+    assert res.get_json()["status"] == "ok"
+    import time; time.sleep(0.05)
+    app_module.rebuild_status["running"] = False
+
+
+def test_rebuild_embeddings_already_running(client):
+    import backend.app as app_module
+    app_module.rebuild_status["running"] = True
+    try:
+        res = client.post("/rebuild-embeddings", content_type="application/json")
+        assert res.status_code == 409
+    finally:
+        app_module.rebuild_status["running"] = False
+
+
+def test_rebuild_embeddings_status_shape(client):
+    res = client.get("/rebuild-embeddings/status")
+    assert res.status_code == 200
+    data = res.get_json()
+    assert "running" in data
+    assert "logs" in data
+    assert "count" in data
+    assert "error" in data
