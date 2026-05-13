@@ -12,8 +12,27 @@ INDEX_FILE = os.path.join(os.path.dirname(__file__), "index.json")
 VECTOR_DB_FILE = os.path.join(os.path.dirname(__file__), "vector.faiss")
 METADATA_FILE = os.path.join(os.path.dirname(__file__), "metadata.json")
 
+CHUNK_SIZE = 1600
+CHUNK_OVERLAP = 200
+
 # Initialize OpenAI client
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+
+
+def chunk_text(text: str, chunk_size: int = CHUNK_SIZE, overlap: int = CHUNK_OVERLAP) -> list[str]:
+    """Split text into overlapping fixed-size chunks."""
+    if not text or not text.strip():
+        return []
+    chunks = []
+    start = 0
+    while start < len(text):
+        end = start + chunk_size
+        chunks.append(text[start:end])
+        if end >= len(text):
+            break
+        start = end - overlap
+    return chunks
+
 
 def get_embedding(text, model="text-embedding-3-small"):
     """Generate embeddings using OpenAI."""
