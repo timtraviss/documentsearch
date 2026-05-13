@@ -3,6 +3,7 @@ import {
   Box,
   Button,
   Checkbox,
+  Divider,
   Group,
   Modal,
   ScrollArea,
@@ -12,7 +13,7 @@ import {
 } from '@mantine/core'
 import { notifications } from '@mantine/notifications'
 import { IconRefresh } from '@tabler/icons-react'
-import { startReindex, getReindexStatus } from '../api'
+import { startReindex, getReindexStatus, startRebuildEmbeddings, getRebuildEmbeddingsStatus } from '../api'
 
 interface Props {
   opened: boolean
@@ -28,6 +29,11 @@ export default function ReindexModal({ opened, onClose, onComplete }: Props) {
   const [obsidian, setObsidian] = useState<{ wrote: number; skipped: number } | null>(null)
   const logRef = useRef<HTMLDivElement>(null)
   const pollingRef = useRef(false)
+
+  const [rebuildRunning, setRebuildRunning] = useState(false)
+  const [rebuildLogs, setRebuildLogs] = useState<string[]>([])
+  const [rebuildDone, setRebuildDone] = useState(false)
+  const rebuildPollingRef = useRef(false)
 
   // Auto-scroll log to bottom
   useEffect(() => {
@@ -83,6 +89,49 @@ export default function ReindexModal({ opened, onClose, onComplete }: Props) {
         setRunning(false)
         break
       }
+    }
+  }
+
+  async function pollRebuild() {
+    if (rebuildPollingRef.current) return
+    rebuildPollingRef.current = true
+    let lastLen = 0
+    while (true) {
+      await new Promise((r) => setTimeout(r, 1000))
+      try {
+        const s = await getRebuildEmbeddingsStatus()
+        if (s.logs && s.logs.length > lastLen) {
+          setRebuildLogs(s.logs)
+          lastLen = s.logs.length
+        }
+        if (!s.running) {
+          rebuildPollingRef.current = false
+          setRebuildRunning(false)
+          setRebuildDone(true)
+          if (s.error) {
+            setRebuildLogs((prev) => [...prev, `Error: ${s.error}`])
+          }
+          break
+        }
+      } catch {
+        rebuildPollingRef.current = false
+        setRebuildRunning(false)
+        break
+      }
+    }
+  }
+
+  const handleRebuildEmbeddings = async () => {
+    setRebuildLogs([])
+    setRebuildDone(false)
+    setRebuildRunning(true)
+    try {
+      await startRebuildEmbeddings()
+      pollRebuild()
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : 'Unknown error'
+      notifications.show({ color: 'red', message: `Failed to rebuild embeddings: ${msg}` })
+      setRebuildRunning(false)
     }
   }
 
@@ -183,6 +232,50 @@ export default function ReindexModal({ opened, onClose, onComplete }: Props) {
               }}
             >
               {logs.join('\n')}
+            </Box>
+          </ScrollArea>
+        )}
+
+        <Divider my="xs" label="Semantic Search" labelPosition="left" />
+
+        <Text size="sm" c="dimmed">
+          Rebuild the AI embeddings index used by{' '}
+          <strong>Ask AI</strong> mode. Run this after a full re-index when new
+          documents have been added.
+        </Text>
+
+        <Group>
+          <Button
+            variant="light"
+            color="teal"
+            loading={rebuildRunning}
+            disabled={rebuildRunning}
+            onClick={handleRebuildEmbeddings}
+          >
+            {rebuildRunning ? 'Building embeddings…' : 'Rebuild embeddings'}
+          </Button>
+          {rebuildDone && (
+            <Text size="sm" c="teal">✓ Done</Text>
+          )}
+        </Group>
+
+        {rebuildLogs.length > 0 && (
+          <ScrollArea
+            h={160}
+            style={{ background: '#0f1724', borderRadius: 6, padding: '0.75rem' }}
+          >
+            <Box
+              component="pre"
+              style={{
+                fontFamily: 'var(--mantine-font-family-monospace)',
+                fontSize: 12,
+                color: '#e6eef8',
+                margin: 0,
+                whiteSpace: 'pre-wrap',
+                wordBreak: 'break-all',
+              }}
+            >
+              {rebuildLogs.join('\n')}
             </Box>
           </ScrollArea>
         )}
