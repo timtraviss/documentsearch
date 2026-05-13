@@ -16,6 +16,7 @@ import {
 import { notifications } from '@mantine/notifications'
 import { motion, AnimatePresence } from 'framer-motion'
 import SearchBar from './components/SearchBar'
+import AskPanel from './components/AskPanel'
 import ResultCard from './components/ResultCard'
 import WelcomeState from './components/WelcomeState'
 import PdfModal from './components/PdfModal'
@@ -33,7 +34,7 @@ import {
   search,
   PAGE_SIZE,
 } from './api'
-import type { DocumentTags, SearchFilters, SearchResult, Stats } from './types'
+import type { AppMode, AskMessage, DocumentTags, SearchFilters, SearchResult, Stats } from './types'
 
 const DEFAULT_FILTERS: SearchFilters = {
   q: '', company: '', date: '', amount: '',
@@ -53,6 +54,8 @@ export default function App() {
   const [isSearching, setIsSearching] = useState(false)
   const [isIndexing, setIsIndexing] = useState(false)
   const [showWelcome, setShowWelcome] = useState(true)
+  const [searchMode, setSearchMode] = useState<AppMode>('search')
+  const [askMessages, setAskMessages] = useState<AskMessage[]>([])
 
   const [selectedPaths, setSelectedPaths] = useState<Set<string>>(new Set())
   const [viewingDoc, setViewingDoc] = useState<SearchResult | null>(null)
@@ -195,8 +198,10 @@ export default function App() {
                 filters={filters}
                 tagYears={tagYears}
                 companies={companies}
-                resultCount={total}
+                resultCount={searchMode === 'search' ? total : null}
                 isIndexing={isIndexing}
+                appMode={searchMode}
+                onModeChange={setSearchMode}
                 onSearch={handleSearch}
                 onClear={handleClear}
                 onExportCsv={() => exportCsv(filters)}
@@ -207,92 +212,102 @@ export default function App() {
               />
             </motion.div>
 
-            {/* Welcome state */}
-            <AnimatePresence>
-              {showWelcome && (
-                <motion.div
-                  key="welcome"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  transition={{ duration: 0.25 }}
-                >
-                  <WelcomeState
-                    stats={stats}
-                    companies={companies}
-                    onSearch={handleQuickSearch}
-                  />
-                </motion.div>
-              )}
-            </AnimatePresence>
-
-            {/* Loading */}
-            {isSearching && results.length === 0 && (
-              <Center py="xl">
-                <Text c="dimmed" size="sm">Searching…</Text>
-              </Center>
-            )}
-
-            {/* No results */}
-            {!isSearching && !showWelcome && results.length === 0 && (
-              <Center py="xl">
-                <Text c="dimmed">No results found. Try different keywords or filters.</Text>
-              </Center>
-            )}
-
-            {/* Results grid */}
-            <AnimatePresence>
-              {results.length > 0 && (
-                <motion.div
-                  key="results"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  transition={{ duration: 0.2 }}
-                >
-                  <SimpleGrid cols={{ base: 1, sm: 2, lg: 3 }} spacing="md">
-                    {results.map((doc, i) => (
-                      <motion.div
-                        key={doc.path}
-                        initial={{ opacity: 0, y: 12 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ duration: 0.2, delay: Math.min(i * 0.03, 0.3) }}
-                      >
-                        <ResultCard
-                          doc={doc}
-                          query={filters.q}
-                          selected={selectedPaths.has(doc.path)}
-                          onToggleSelect={toggleSelect}
-                          onView={handleView}
-                          onDelete={setDeleteTarget}
-                        />
-                      </motion.div>
-                    ))}
-                  </SimpleGrid>
-
-                  {hasMore && (
-                    <Center mt="lg">
-                      <Button
-                        variant="default"
-                        loading={isSearching}
-                        onClick={() => runSearch(activeFiltersRef.current, true)}
-                      >
-                        Load more
-                      </Button>
-                    </Center>
+            {searchMode === 'ask' ? (
+              <AskPanel
+                messages={askMessages}
+                onMessagesChange={setAskMessages}
+                onOpenPdf={handleView}
+              />
+            ) : (
+              <>
+                {/* Welcome state */}
+                <AnimatePresence>
+                  {showWelcome && (
+                    <motion.div
+                      key="welcome"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      transition={{ duration: 0.25 }}
+                    >
+                      <WelcomeState
+                        stats={stats}
+                        companies={companies}
+                        onSearch={handleQuickSearch}
+                      />
+                    </motion.div>
                   )}
+                </AnimatePresence>
 
-                  <BulkToolbar
-                    selectedPaths={selectedPaths}
-                    companies={companies}
-                    onApplied={() => {
-                      setSelectedPaths(new Set())
-                      runSearch(activeFiltersRef.current, false)
-                    }}
-                    onDeselect={() => setSelectedPaths(new Set())}
-                  />
-                </motion.div>
-              )}
-            </AnimatePresence>
+                {/* Loading */}
+                {isSearching && results.length === 0 && (
+                  <Center py="xl">
+                    <Text c="dimmed" size="sm">Searching…</Text>
+                  </Center>
+                )}
+
+                {/* No results */}
+                {!isSearching && !showWelcome && results.length === 0 && (
+                  <Center py="xl">
+                    <Text c="dimmed">No results found. Try different keywords or filters.</Text>
+                  </Center>
+                )}
+
+                {/* Results grid */}
+                <AnimatePresence>
+                  {results.length > 0 && (
+                    <motion.div
+                      key="results"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      transition={{ duration: 0.2 }}
+                    >
+                      <SimpleGrid cols={{ base: 1, sm: 2, lg: 3 }} spacing="md">
+                        {results.map((doc, i) => (
+                          <motion.div
+                            key={doc.path}
+                            initial={{ opacity: 0, y: 12 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ duration: 0.2, delay: Math.min(i * 0.03, 0.3) }}
+                          >
+                            <ResultCard
+                              doc={doc}
+                              query={filters.q}
+                              selected={selectedPaths.has(doc.path)}
+                              onToggleSelect={toggleSelect}
+                              onView={handleView}
+                              onDelete={setDeleteTarget}
+                            />
+                          </motion.div>
+                        ))}
+                      </SimpleGrid>
+
+                      {hasMore && (
+                        <Center mt="lg">
+                          <Button
+                            variant="default"
+                            loading={isSearching}
+                            onClick={() => runSearch(activeFiltersRef.current, true)}
+                          >
+                            Load more
+                          </Button>
+                        </Center>
+                      )}
+
+                      <BulkToolbar
+                        selectedPaths={selectedPaths}
+                        companies={companies}
+                        onApplied={() => {
+                          setSelectedPaths(new Set())
+                          runSearch(activeFiltersRef.current, false)
+                        }}
+                        onDeselect={() => setSelectedPaths(new Set())}
+                      />
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </>
+            )}
           </Stack>
         </Container>
       </AppShell.Main>
