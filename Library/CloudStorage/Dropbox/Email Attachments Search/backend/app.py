@@ -70,12 +70,16 @@ def close_db(exc):
 
 try:
     from embeddings import search as semantic_search, search_chunks
-    HAS_EMBEDDINGS = os.path.exists(
-        os.path.join(os.path.dirname(__file__), "vector.faiss")
-    )
+    _EMBEDDINGS_IMPORT_OK = True
 except ImportError:
-    HAS_EMBEDDINGS = False
+    _EMBEDDINGS_IMPORT_OK = False
     search_chunks = None
+
+_VECTOR_DB_FILE = os.path.join(os.path.dirname(__file__), "vector.faiss")
+
+
+def HAS_EMBEDDINGS() -> bool:  # type: ignore[misc]
+    return _EMBEDDINGS_IMPORT_OK and os.path.exists(_VECTOR_DB_FILE)
 
 REINDEX_TOKEN = os.getenv("REINDEX_TOKEN")
 APP_VERSION = "0.5"
@@ -347,7 +351,7 @@ def home():
     # Fallback: legacy Jinja template when React hasn't been built yet
     return render_template(
         "search.html",
-        has_embeddings=HAS_EMBEDDINGS,
+        has_embeddings=HAS_EMBEDDINGS(),
         reindex_token_present=bool(REINDEX_TOKEN),
         version=APP_VERSION,
     )
@@ -362,7 +366,7 @@ def react_assets(filename: str):
 @app.route("/search")
 def search():
     q = request.args.get("q", "").lower()
-    search_type = request.args.get("type", "semantic" if HAS_EMBEDDINGS else "text")
+    search_type = request.args.get("type", "semantic" if HAS_EMBEDDINGS() else "text")
     filter_company = request.args.get("company", "").lower()
     filter_date = request.args.get("date", "")
     filter_amount = request.args.get("amount", "")
@@ -390,7 +394,7 @@ def search():
         return jsonify(results[offset:offset + limit])
 
     # Text or semantic search
-    if search_type == "semantic" and HAS_EMBEDDINGS:
+    if search_type == "semantic" and HAS_EMBEDDINGS():
         try:
             top_k = 50 if has_tag_filters else 10
             results = semantic_search(q, top_k=top_k)
@@ -431,7 +435,7 @@ def ask():
     if not query:
         return jsonify({"error": "query is required"}), 400
 
-    if not HAS_EMBEDDINGS:
+    if not HAS_EMBEDDINGS():
         return jsonify({
             "error": "Embeddings not built. Rebuild embeddings from Tools → Re-index."
         }), 503
