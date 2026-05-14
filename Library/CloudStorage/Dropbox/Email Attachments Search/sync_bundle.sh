@@ -16,6 +16,7 @@ echo "Syncing source → bundle..."
 cp "$SRC/app.py"                  "$BUNDLE/app.py"
 cp "$SRC/indexer.py"              "$BUNDLE/indexer.py"
 cp "$SRC/database.py"             "$BUNDLE/database.py"
+cp "$SRC/embeddings.py"           "$BUNDLE/embeddings.py"
 cp "$SRC/extraction.py"           "$BUNDLE/extraction.py"
 cp "$SRC/obsidian.py"             "$BUNDLE/obsidian.py"
 cp "$SRC/obsidian_claude.py"      "$BUNDLE/obsidian_claude.py"
@@ -48,6 +49,7 @@ cp "app_launcher.py"              "dist/Document Search.app/Contents/Resources/a
 rm -f "$BUNDLE/__pycache__/app"*.pyc \
       "$BUNDLE/__pycache__/indexer"*.pyc \
       "$BUNDLE/__pycache__/database"*.pyc \
+      "$BUNDLE/__pycache__/embeddings"*.pyc \
       "$BUNDLE/__pycache__/extraction"*.pyc \
       "$BUNDLE/__pycache__/obsidian"*.pyc \
       "$BUNDLE/__pycache__/obsidian_claude"*.pyc \
