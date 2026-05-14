@@ -56,13 +56,15 @@ This scans your PDF folder and creates `backend/index.json` with extracted text 
 
 ### 4. Generate Embeddings (Optional)
 
-For semantic AI-powered search, you'll need an OpenAI API key:
+For Ask AI mode you'll need both an OpenAI API key (embeddings) and an Anthropic API key (answers). Once both are in `.env`, use the in-app button: **Tools → Re-index → Rebuild embeddings**.
+
+Alternatively, run from the command line:
 
 ```bash
 python backend/embeddings.py
 ```
 
-This creates `backend/vector.faiss` (vector database) and `backend/metadata.json`.
+This creates `backend/vector.faiss` and `backend/metadata.json`. The process is **incremental** — if interrupted, re-running resumes from where it left off rather than starting over.
 
 ### 5. Run the Web App
 
@@ -80,7 +82,7 @@ To create a standalone `.app` that can be double-clicked to launch:
 python setup.py py2app
 ```
 
-The built app will be in `dist/Document Search.app`. You can move it to `/Applications` or run it directly. The app will:
+The built app will be in `dist/Document Search.app`. You can move it to `/Applications` or run it directly. After moving to `/Applications`, use `bash sync_bundle.sh` for all subsequent source changes — it updates both `dist/` and `/Applications/` automatically. The app will:
 
 - Start the Flask server automatically when opened
 - Open your default browser to the application
@@ -369,6 +371,7 @@ The DB is stored in the Dropbox project folder (`backend/search.db`), giving aut
 
 ## Version History
 
+- **v0.8.1** — 2026-05-14 — Bug fixes for Ask AI: incremental embedding saves (flushes every 10 docs so crashes don't lose progress); skip individual failed documents instead of aborting; `HAS_EMBEDDINGS` now a dynamic file check (no restart required after building); `backend.embeddings` fallback import for `.app` bundle compatibility; `sync_bundle.sh` now syncs both `dist/` and `/Applications/` automatically; `embeddings.py` added to sync list (was missing)
 - **v0.8** — 2026-05-14 — Ask AI conversational mode: chunked FAISS embeddings (1600-char chunks, 200-char overlap, loaded from SQLite), `/ask` endpoint using Claude `claude-sonnet-4-6` for synthesis, `AskPanel` component with chat history + source document cards + follow-up support, Search/Ask mode toggle in SearchBar, Rebuild Embeddings section in ReindexModal with live log streaming
 - **v0.7** — 2026-05-02 — Obsidian sidecar export (writes `Bills/<year>/YYYY-MM-DD-vendor.md` on re-index with YAML frontmatter + extracted text; regex or Claude extraction mode; result badges in ReindexModal); File Loose PDFs tool (Tools menu → scans PDF folder root and moves unorganised invoices into company subfolders; dry-run mode)
 - **v0.6** — 2026-04-22 — Delete document feature (moves files to `Deleted/` folder with timestamp prefix); fix company filter to match tagged companies and replace text input with dropdown; fix amount formatting to include comma separators (e.g. $1,000.00); fix path traversal on `/pdf` and `/document` DELETE routes
