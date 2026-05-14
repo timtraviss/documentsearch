@@ -84,8 +84,14 @@ def create_vector_db(progress_callback=None, incremental: bool = True) -> int:
     if not pending_rows:
         return len(existing_metadata)
 
-    new_embeddings: list[list[float]] = []
-    new_metadata: list[dict] = []
+    # Build working index from existing state
+    accumulated_metadata: list[dict] = list(existing_metadata)
+    if existing_index is not None:
+        working_index = existing_index
+    else:
+        working_index = None
+
+    SAVE_EVERY = 10  # flush to disk after every N documents
 
     for i, row in enumerate(pending_rows):
         text = row["text"] or ""
@@ -94,42 +100,51 @@ def create_vector_db(progress_callback=None, incremental: bool = True) -> int:
                 progress_callback(row["filename"], i + 1, len(pending_rows))
             continue
 
-        chunks = chunk_text(text)
-        for chunk_idx, chunk in enumerate(chunks):
-            embedding = get_embedding(chunk)
-            if embedding:
-                new_embeddings.append(embedding)
-                new_metadata.append({
-                    "path": row["relative_path"],
-                    "filename": row["filename"],
-                    "chunk_index": chunk_idx,
-                    "snippet": chunk[:300],
-                })
+        try:
+            chunks = chunk_text(text)
+            doc_embeddings: list[list[float]] = []
+            doc_metadata: list[dict] = []
+            for chunk_idx, chunk in enumerate(chunks):
+                embedding = get_embedding(chunk)
+                if embedding:
+                    doc_embeddings.append(embedding)
+                    doc_metadata.append({
+                        "path": row["relative_path"],
+                        "filename": row["filename"],
+                        "chunk_index": chunk_idx,
+                        "snippet": chunk[:300],
+                    })
+
+            if doc_embeddings:
+                arr = np.array(doc_embeddings).astype("float32")
+                if working_index is None:
+                    working_index = faiss.IndexFlatL2(arr.shape[1])
+                working_index.add(arr)
+                accumulated_metadata.extend(doc_metadata)
+
+        except Exception as exc:
+            print(f"⚠️  Skipping {row['filename']}: {exc}")
 
         if progress_callback:
             progress_callback(row["filename"], i + 1, len(pending_rows))
 
-    if not new_embeddings:
-        return len(existing_metadata)
+        # Flush to disk periodically so crashes don't lose progress
+        if working_index is not None and (i + 1) % SAVE_EVERY == 0:
+            faiss.write_index(working_index, VECTOR_DB_FILE)
+            with open(METADATA_FILE, "w", encoding="utf-8") as f:
+                json.dump(accumulated_metadata, f, indent=2)
 
-    new_array = np.array(new_embeddings).astype("float32")
+    if working_index is None:
+        return 0
 
-    if existing_index is not None:
-        existing_index.add(new_array)
-        final_index = existing_index
-        final_metadata = existing_metadata + new_metadata
-    else:
-        dimension = new_array.shape[1]
-        final_index = faiss.IndexFlatL2(dimension)
-        final_index.add(new_array)
-        final_metadata = new_metadata
-
-    faiss.write_index(final_index, VECTOR_DB_FILE)
+    # Final save
+    faiss.write_index(working_index, VECTOR_DB_FILE)
     with open(METADATA_FILE, "w", encoding="utf-8") as f:
-        json.dump(final_metadata, f, indent=2)
+        json.dump(accumulated_metadata, f, indent=2)
 
-    print(f"✅ Vector DB: {len(final_metadata)} total chunks ({len(new_metadata)} new from {len(pending_rows)} documents)")
-    return len(final_metadata)
+    new_count = len(accumulated_metadata) - len(existing_metadata)
+    print(f"✅ Vector DB: {len(accumulated_metadata)} total chunks ({new_count} new from {len(pending_rows)} documents)")
+    return len(accumulated_metadata)
 
 
 def search_chunks(query: str, top_k: int = 6) -> list[dict]:
