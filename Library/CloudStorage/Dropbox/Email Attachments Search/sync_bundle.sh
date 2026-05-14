@@ -55,4 +55,34 @@ rm -f "$BUNDLE/__pycache__/app"*.pyc \
       "$BUNDLE/__pycache__/obsidian_claude"*.pyc \
       "$BUNDLE/__pycache__/filer"*.pyc
 
+# Also sync to /Applications/ if the app is installed there
+APP_BUNDLE="/Applications/Document Search.app/Contents/Resources/lib/python3.12/backend"
+if [ -d "/Applications/Document Search.app" ]; then
+  echo "Syncing to /Applications/Document Search.app..."
+  cp "$SRC/app.py"                  "$APP_BUNDLE/app.py"
+  cp "$SRC/indexer.py"              "$APP_BUNDLE/indexer.py"
+  cp "$SRC/database.py"             "$APP_BUNDLE/database.py"
+  cp "$SRC/embeddings.py"           "$APP_BUNDLE/embeddings.py"
+  cp "$SRC/extraction.py"           "$APP_BUNDLE/extraction.py"
+  cp "$SRC/obsidian.py"             "$APP_BUNDLE/obsidian.py"
+  cp "$SRC/obsidian_claude.py"      "$APP_BUNDLE/obsidian_claude.py"
+  cp "$SRC/filer.py"                "$APP_BUNDLE/filer.py"
+  APPLIB="/Applications/Document Search.app/Contents/Resources/lib/python3.12"
+  APP_STATIC="$APP_BUNDLE/static"
+  mkdir -p "$APP_STATIC/assets"
+  cp "$SRC/static/index.html"       "$APP_STATIC/index.html"
+  rsync -a --delete "$SRC/static/assets/" "$APP_STATIC/assets/"
+  cp ".env"                         "/Applications/Document Search.app/Contents/Resources/.env"
+  cp "app_launcher.py"              "/Applications/Document Search.app/Contents/Resources/app_launcher.py"
+  rm -f "$APP_BUNDLE/__pycache__/app"*.pyc \
+        "$APP_BUNDLE/__pycache__/indexer"*.pyc \
+        "$APP_BUNDLE/__pycache__/database"*.pyc \
+        "$APP_BUNDLE/__pycache__/embeddings"*.pyc \
+        "$APP_BUNDLE/__pycache__/extraction"*.pyc \
+        "$APP_BUNDLE/__pycache__/obsidian"*.pyc \
+        "$APP_BUNDLE/__pycache__/obsidian_claude"*.pyc \
+        "$APP_BUNDLE/__pycache__/filer"*.pyc
+  echo "  Synced /Applications bundle."
+fi
+
 echo "Done. Relaunch the app to see changes."

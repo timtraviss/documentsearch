@@ -70,7 +70,10 @@ def close_db(exc):
 
 _EMBEDDINGS_IMPORT_ERROR: str = ""
 try:
-    from embeddings import search as semantic_search, search_chunks
+    try:
+        from embeddings import search as semantic_search, search_chunks
+    except ImportError:
+        from backend.embeddings import search as semantic_search, search_chunks
     _EMBEDDINGS_IMPORT_OK = True
 except Exception as _e:
     _EMBEDDINGS_IMPORT_OK = False
