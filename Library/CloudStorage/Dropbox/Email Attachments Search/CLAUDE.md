@@ -50,7 +50,7 @@ open "dist/Document Search.app"
 ```bash
 bash sync_bundle.sh
 ```
-This builds the React frontend (`npm run build`), then copies `app.py`, `indexer.py`, the Vite output (`backend/static/`), and `app_launcher.py` into the bundle and clears cached `.pyc` files. Always run this after edits when testing via the .app.
+This builds the React frontend (`npm run build`), copies all backend `.py` files and Vite output into the bundle, and clears cached `.pyc` files. It syncs to **both** `dist/Document Search.app` and `/Applications/Document Search.app` (if present). Always run this after edits when testing via the .app.
 
 **Full bundle rebuild (only needed when adding new Python packages):**
 ```bash
@@ -130,7 +130,7 @@ REINDEX_TOKEN=...        # optional, protects /reindex endpoint
 ### macOS bundle notes
 - py2app bundles Python + all dependencies into `dist/Document Search.app`
 - The bundle's Python is at `Contents/Resources/lib/python3.12/`
-- `sync_bundle.sh` builds the frontend then syncs everything — run this for all source changes
+- `sync_bundle.sh` builds the frontend then syncs all backend `.py` files and static assets — run this for all source changes; syncs both `dist/` and `/Applications/` automatically
 - `setup.py py2app` is needed only when adding new Python packages
 - macOS TCC (Full Disk Access) must be granted in System Settings for the .app to read files in `~/Library/CloudStorage/Dropbox/`
 - Tags survive rebuilds because `DB_PATH` points outside the bundle
