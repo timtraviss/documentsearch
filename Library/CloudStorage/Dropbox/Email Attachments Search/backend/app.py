@@ -68,11 +68,13 @@ def close_db(exc):
 # Optional semantic search
 # ---------------------------------------------------------------------------
 
+_EMBEDDINGS_IMPORT_ERROR: str = ""
 try:
     from embeddings import search as semantic_search, search_chunks
     _EMBEDDINGS_IMPORT_OK = True
-except ImportError:
+except Exception as _e:
     _EMBEDDINGS_IMPORT_OK = False
+    _EMBEDDINGS_IMPORT_ERROR = str(_e)
     search_chunks = None
 
 _VECTOR_DB_FILE = os.path.join(os.path.dirname(__file__), "vector.faiss")
@@ -436,8 +438,12 @@ def ask():
         return jsonify({"error": "query is required"}), 400
 
     if not HAS_EMBEDDINGS():
+        detail = f" (import_ok={_EMBEDDINGS_IMPORT_OK}"
+        if _EMBEDDINGS_IMPORT_ERROR:
+            detail += f", import_error={_EMBEDDINGS_IMPORT_ERROR}"
+        detail += f", file_exists={os.path.exists(_VECTOR_DB_FILE)}, path={_VECTOR_DB_FILE})"
         return jsonify({
-            "error": "Embeddings not built. Rebuild embeddings from Tools → Re-index."
+            "error": f"Embeddings not built. Rebuild embeddings from Tools → Re-index.{detail}"
         }), 503
 
     anthropic_key = os.getenv("ANTHROPIC_API_KEY", "").strip()
