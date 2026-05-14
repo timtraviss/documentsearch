@@ -34,11 +34,15 @@ export default function ReindexModal({ opened, onClose, onComplete }: Props) {
   const [rebuildLogs, setRebuildLogs] = useState<string[]>([])
   const [rebuildDone, setRebuildDone] = useState(false)
   const rebuildPollingRef = useRef(false)
+  const rebuildLogRef = useRef<HTMLDivElement>(null)
 
-  // Auto-scroll log to bottom
+  // Auto-scroll logs to bottom
   useEffect(() => {
     if (logRef.current) logRef.current.scrollTop = logRef.current.scrollHeight
   }, [logs])
+  useEffect(() => {
+    if (rebuildLogRef.current) rebuildLogRef.current.scrollTop = rebuildLogRef.current.scrollHeight
+  }, [rebuildLogs])
 
   // On open, check if a reindex is already running (e.g. page refresh mid-index)
   useEffect(() => {
@@ -262,6 +266,7 @@ export default function ReindexModal({ opened, onClose, onComplete }: Props) {
         {rebuildLogs.length > 0 && (
           <ScrollArea
             h={160}
+            viewportRef={rebuildLogRef}
             style={{ background: '#0f1724', borderRadius: 6, padding: '0.75rem' }}
           >
             <Box
