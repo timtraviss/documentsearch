@@ -42,11 +42,12 @@ def get_embedding(text: str, model: str = "text-embedding-3-small") -> list[floa
     return response.data[0].embedding
 
 
-def create_vector_db(progress_callback=None) -> int:
-    """Build FAISS vector DB from SQLite documents table using chunked embeddings.
+def create_vector_db(progress_callback=None, incremental: bool = True) -> int:
+    """Build/update FAISS vector DB from SQLite documents table using chunked embeddings.
 
-    Returns the number of chunks embedded.
-    Loads documents from search.db — run after a full re-index if documents change.
+    With incremental=True (default), skips documents already present in metadata.json
+    and appends new chunks to the existing FAISS index — safe to resume after interruption.
+    Returns the total number of chunks in the final index.
     """
     try:
         from backend.database import get_connection
@@ -61,20 +62,44 @@ def create_vector_db(progress_callback=None) -> int:
     finally:
         conn.close()
 
-    embeddings: list[list[float]] = []
-    metadata: list[dict] = []
+    # Load existing state for incremental mode
+    existing_metadata: list[dict] = []
+    existing_paths: set[str] = set()
+    existing_index = None
 
-    for i, row in enumerate(rows):
+    if incremental and os.path.exists(VECTOR_DB_FILE) and os.path.exists(METADATA_FILE):
+        try:
+            with open(METADATA_FILE, "r", encoding="utf-8") as f:
+                existing_metadata = json.load(f)
+            existing_index = faiss.read_index(VECTOR_DB_FILE)
+            existing_paths = {m["path"] for m in existing_metadata}
+        except Exception:
+            # Corrupted files — fall back to full rebuild
+            existing_metadata = []
+            existing_paths = set()
+            existing_index = None
+
+    pending_rows = [r for r in rows if r["relative_path"] not in existing_paths]
+
+    if not pending_rows:
+        return len(existing_metadata)
+
+    new_embeddings: list[list[float]] = []
+    new_metadata: list[dict] = []
+
+    for i, row in enumerate(pending_rows):
         text = row["text"] or ""
         if not text.strip():
+            if progress_callback:
+                progress_callback(row["filename"], i + 1, len(pending_rows))
             continue
 
         chunks = chunk_text(text)
         for chunk_idx, chunk in enumerate(chunks):
             embedding = get_embedding(chunk)
             if embedding:
-                embeddings.append(embedding)
-                metadata.append({
+                new_embeddings.append(embedding)
+                new_metadata.append({
                     "path": row["relative_path"],
                     "filename": row["filename"],
                     "chunk_index": chunk_idx,
@@ -82,23 +107,29 @@ def create_vector_db(progress_callback=None) -> int:
                 })
 
         if progress_callback:
-            progress_callback(row["filename"], i + 1, len(rows))
+            progress_callback(row["filename"], i + 1, len(pending_rows))
 
-    if not embeddings:
-        print("No embeddings generated — is search.db populated?")
-        return 0
+    if not new_embeddings:
+        return len(existing_metadata)
 
-    embeddings_array = np.array(embeddings).astype("float32")
-    dimension = embeddings_array.shape[1]
-    index = faiss.IndexFlatL2(dimension)
-    index.add(embeddings_array)
+    new_array = np.array(new_embeddings).astype("float32")
 
-    faiss.write_index(index, VECTOR_DB_FILE)
+    if existing_index is not None:
+        existing_index.add(new_array)
+        final_index = existing_index
+        final_metadata = existing_metadata + new_metadata
+    else:
+        dimension = new_array.shape[1]
+        final_index = faiss.IndexFlatL2(dimension)
+        final_index.add(new_array)
+        final_metadata = new_metadata
+
+    faiss.write_index(final_index, VECTOR_DB_FILE)
     with open(METADATA_FILE, "w", encoding="utf-8") as f:
-        json.dump(metadata, f, indent=2)
+        json.dump(final_metadata, f, indent=2)
 
-    print(f"✅ Vector DB: {len(metadata)} chunks from {len(rows)} documents")
-    return len(metadata)
+    print(f"✅ Vector DB: {len(final_metadata)} total chunks ({len(new_metadata)} new from {len(pending_rows)} documents)")
+    return len(final_metadata)
 
 
 def search_chunks(query: str, top_k: int = 6) -> list[dict]:

@@ -632,7 +632,21 @@ def rebuild_embeddings_route():
             rebuild_status["logs"] = []
             rebuild_status["count"] = 0
             rebuild_status["error"] = None
-            _log("Starting embedding rebuild...")
+
+            # Report how many are already done before starting
+            meta_file = os.path.join(os.path.dirname(__file__), "metadata.json")
+            faiss_file = os.path.join(os.path.dirname(__file__), "vector.faiss")
+            if os.path.exists(meta_file) and os.path.exists(faiss_file):
+                try:
+                    import json as _json
+                    with open(meta_file) as _f:
+                        _existing = _json.load(_f)
+                    already_done = len({m["path"] for m in _existing})
+                    _log(f"Resuming — {already_done} documents already embedded. Checking for new ones...")
+                except Exception:
+                    _log("Starting embedding rebuild...")
+            else:
+                _log("Starting embedding rebuild...")
 
             try:
                 from embeddings import create_vector_db
@@ -644,7 +658,7 @@ def rebuild_embeddings_route():
 
             count = create_vector_db(progress_callback=progress_cb)
             rebuild_status["count"] = count
-            _log(f"Done. {count} chunks embedded.")
+            _log(f"Done. {count} total chunks in index.")
         except Exception as e:
             rebuild_status["error"] = str(e)
             _log(f"Error: {e}")
