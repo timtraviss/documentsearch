@@ -430,6 +430,79 @@ def search():
     return jsonify(results[offset:offset + limit])
 
 
+# ---------------------------------------------------------------------------
+# Ask AI — structured + vector dual retrieval helpers
+# ---------------------------------------------------------------------------
+
+def _parse_amount_float(s: str) -> float:
+    try:
+        return float(re.sub(r"[^0-9.]", "", s or ""))
+    except ValueError:
+        return 0.0
+
+
+def _extract_query_intent(query: str, conn):
+    """Return (company_str_or_None, year_str_or_None) detected in the query."""
+    q_lower = query.lower()
+    year = None
+    for y in range(2020, 2031):
+        if str(y) in q_lower:
+            year = str(y)
+            break
+    companies = [
+        r["company"]
+        for r in conn.execute(
+            "SELECT DISTINCT company FROM tags WHERE company != ''"
+        ).fetchall()
+    ]
+    matched = next((c for c in companies if c.lower() in q_lower), None)
+    return matched, year
+
+
+def _query_tags_structured(conn, company, year) -> list:
+    clauses, params = [], []
+    if company:
+        clauses.append("LOWER(t.company) = ?")
+        params.append(company.lower())
+    if year:
+        clauses.append("t.year = ?")
+        params.append(year)
+    if not clauses:
+        return []
+    where = " AND ".join(clauses)
+    rows = conn.execute(
+        f"SELECT d.filename, t.company, t.year, t.amount, t.type, t.invoice_number, d.text "
+        f"FROM tags t JOIN documents d ON d.relative_path = t.relative_path "
+        f"WHERE {where} ORDER BY t.year, d.filename",
+        params,
+    ).fetchall()
+    result = []
+    for r in rows:
+        row = dict(r)
+        if not row.get("amount"):
+            row["amount"] = extract_total_amount(row.get("text") or "") or ""
+        del row["text"]
+        result.append(row)
+    return result
+
+
+def _format_structured_block(rows: list) -> str:
+    if not rows:
+        return ""
+    total = sum(_parse_amount_float(r.get("amount", "")) for r in rows)
+    lines = [
+        "| File | Company | Year | Type | Amount |",
+        "|---|---|---|---|---|",
+    ]
+    for r in rows:
+        lines.append(
+            f"| {r['filename']} | {r['company']} | {r['year']} "
+            f"| {r['type']} | {r['amount']} |"
+        )
+    lines.append(f"\n**Total: ${total:,.2f}** across {len(rows)} document(s).")
+    return "\n".join(lines)
+
+
 @app.route("/ask", methods=["POST"])
 def ask():
     """Conversational question-answering over indexed PDFs using Claude."""
@@ -458,7 +531,17 @@ def ask():
     except Exception as e:
         return jsonify({"error": f"Embedding search failed: {e}"}), 500
 
-    if not chunks:
+    # Structured SQL lookup — runs even if vector search returns nothing
+    try:
+        conn = get_db()
+        matched_company, matched_year = _extract_query_intent(query, conn)
+        structured_rows = _query_tags_structured(conn, matched_company, matched_year)
+        structured_block = _format_structured_block(structured_rows)
+    except Exception:
+        structured_rows = []
+        structured_block = ""
+
+    if not chunks and not structured_rows:
         return jsonify({
             "answer": "I couldn't find any relevant document excerpts for that question.",
             "sources": [],
@@ -469,6 +552,14 @@ def ask():
         f"[Source: {c['filename']}]\n{c['snippet']}" for c in chunks
     ]
     context = "\n---\n".join(context_parts)
+
+    if structured_block:
+        context = (
+            "## Structured Financial Records\n"
+            + structured_block
+            + "\n\n---\n\n## Document Excerpts\n"
+            + context
+        )
 
     # Deduplicate sources list (one entry per PDF path)
     seen_paths: set[str] = set()
@@ -503,9 +594,12 @@ def ask():
             model="claude-sonnet-4-6",
             max_tokens=1024,
             system=(
-                "You are a document assistant. Answer questions based only on the "
-                "document excerpts provided. Cite documents by filename when relevant. "
-                "If the answer is not in the provided excerpts, say so clearly."
+                "You are a document assistant for a personal PDF archive. "
+                "Answer questions based on the provided context. "
+                "When structured financial records are present, use them to calculate "
+                "totals, counts, and summaries — they are authoritative. "
+                "Cite document filenames when relevant. "
+                "If the answer is not in the provided context, say so clearly."
             ),
             messages=anthropic_messages,
         )
@@ -815,6 +909,18 @@ def serve_pdf(filename):
         return Response(data, mimetype="application/pdf",
                         headers={"Content-Disposition": "inline"})
     except FileNotFoundError:
+        # Stale relative path — search the whole PDF_FOLDER by filename
+        basename = os.path.basename(filename)
+        for dirpath, _, files in os.walk(PDF_FOLDER):
+            if basename in files:
+                fallback = os.path.join(dirpath, basename)
+                try:
+                    with open(fallback, "rb") as f:
+                        data = f.read()
+                    return Response(data, mimetype="application/pdf",
+                                    headers={"Content-Disposition": "inline"})
+                except Exception:
+                    break
         return jsonify({"error": "file not found"}), 404
     except PermissionError:
         return jsonify({
@@ -858,6 +964,105 @@ def delete_document_route(filename):
     conn = get_db()
     delete_document(conn, filename)
     return jsonify({"status": "ok"})
+
+
+@app.route("/manual")
+def get_manual():
+    """Return the user manual markdown from the Obsidian vault (or bundled fallback)."""
+    vault = os.getenv("OBSIDIAN_VAULT", "").strip()
+    manual_path = os.path.join(vault, "Document Search - User Manual.md") if vault else ""
+    if manual_path and os.path.exists(manual_path):
+        with open(manual_path, "r", encoding="utf-8") as f:
+            return jsonify({"content": f.read()})
+    return jsonify({"error": "Manual not found"}), 404
+
+
+@app.route("/cleanup", methods=["POST"])
+def cleanup_index():
+    """Remove missing documents and fix stale paths; remove duplicate filename entries."""
+    if not PDF_FOLDER:
+        return jsonify({"error": "PDF_FOLDER not configured"}), 503
+
+    try:
+        conn = get_db()
+        rows = conn.execute(
+            "SELECT id, relative_path, filename FROM documents"
+        ).fetchall()
+
+        fixed_paths = 0
+        removed_missing = 0
+
+        for row in rows:
+            filepath = _safe_path(PDF_FOLDER, row["relative_path"])
+            if filepath and os.path.exists(filepath):
+                continue  # file is where we expect it
+
+            # Search the whole folder tree by basename
+            basename = os.path.basename(row["relative_path"])
+            found_at = None
+            for dirpath, _, files in os.walk(PDF_FOLDER):
+                if basename in files:
+                    rel = os.path.relpath(os.path.join(dirpath, basename), PDF_FOLDER)
+                    found_at = rel
+                    break
+
+            if found_at:
+                # If the new path is already indexed, the stale row is just a duplicate
+                already_indexed = conn.execute(
+                    "SELECT id FROM documents WHERE relative_path = ?", (found_at,)
+                ).fetchone()
+                if already_indexed:
+                    delete_document(conn, row["relative_path"])
+                    removed_missing += 1
+                else:
+                    conn.execute(
+                        "UPDATE documents SET relative_path = ? WHERE id = ?",
+                        (found_at, row["id"]),
+                    )
+                    conn.execute(
+                        "UPDATE tags SET relative_path = ? WHERE relative_path = ?",
+                        (found_at, row["relative_path"]),
+                    )
+                    fixed_paths += 1
+            else:
+                delete_document(conn, row["relative_path"])
+                removed_missing += 1
+
+        # Remove duplicates: same filename, multiple rows
+        dup_rows = conn.execute("""
+            SELECT filename FROM documents
+            GROUP BY filename HAVING COUNT(*) > 1
+        """).fetchall()
+
+        removed_duplicates = 0
+        for dup in dup_rows:
+            entries = conn.execute(
+                "SELECT id, relative_path FROM documents WHERE filename = ? ORDER BY id DESC",
+                (dup["filename"],),
+            ).fetchall()
+
+            keep_id = None
+            for e in entries:
+                p = _safe_path(PDF_FOLDER, e["relative_path"])
+                if p and os.path.exists(p):
+                    keep_id = e["id"]
+                    break
+            if keep_id is None:
+                keep_id = entries[0]["id"]
+
+            for e in entries:
+                if e["id"] != keep_id:
+                    delete_document(conn, e["relative_path"])
+                    removed_duplicates += 1
+
+        conn.commit()
+        return jsonify({
+            "fixed_paths": fixed_paths,
+            "removed_missing": removed_missing,
+            "removed_duplicates": removed_duplicates,
+        })
+    except Exception as exc:
+        return jsonify({"error": str(exc)}), 500
 
 
 @app.route("/companies")

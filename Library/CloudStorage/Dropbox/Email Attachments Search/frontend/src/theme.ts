@@ -30,7 +30,7 @@ export const theme = createTheme({
     ],
   },
 
-  fontFamily: '"DM Serif Display", Georgia, serif',
+  fontFamily: '"DM Sans", system-ui, sans-serif',
   fontFamilyMonospace: '"DM Mono", "Fira Code", monospace',
 
   headings: {

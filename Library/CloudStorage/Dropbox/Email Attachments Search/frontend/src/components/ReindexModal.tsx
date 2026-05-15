@@ -13,7 +13,8 @@ import {
 } from '@mantine/core'
 import { notifications } from '@mantine/notifications'
 import { IconRefresh } from '@tabler/icons-react'
-import { startReindex, getReindexStatus, startRebuildEmbeddings, getRebuildEmbeddingsStatus } from '../api'
+import { startReindex, getReindexStatus, startRebuildEmbeddings, getRebuildEmbeddingsStatus, runCleanup } from '../api'
+import type { CleanupResult } from '../types'
 
 interface Props {
   opened: boolean
@@ -35,6 +36,9 @@ export default function ReindexModal({ opened, onClose, onComplete }: Props) {
   const [rebuildDone, setRebuildDone] = useState(false)
   const rebuildPollingRef = useRef(false)
   const rebuildLogRef = useRef<HTMLDivElement>(null)
+
+  const [cleanupRunning, setCleanupRunning] = useState(false)
+  const [cleanupResult, setCleanupResult] = useState<CleanupResult | null>(null)
 
   // Auto-scroll logs to bottom
   useEffect(() => {
@@ -136,6 +140,21 @@ export default function ReindexModal({ opened, onClose, onComplete }: Props) {
       const msg = e instanceof Error ? e.message : 'Unknown error'
       notifications.show({ color: 'red', message: `Failed to rebuild embeddings: ${msg}` })
       setRebuildRunning(false)
+    }
+  }
+
+  const handleCleanup = async () => {
+    setCleanupRunning(true)
+    setCleanupResult(null)
+    try {
+      const result = await runCleanup()
+      setCleanupResult(result)
+      if (!result.error) onComplete()
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : 'Unknown error'
+      setCleanupResult({ fixed_paths: 0, removed_missing: 0, removed_duplicates: 0, error: msg })
+    } finally {
+      setCleanupRunning(false)
     }
   }
 
@@ -284,6 +303,41 @@ export default function ReindexModal({ opened, onClose, onComplete }: Props) {
             </Box>
           </ScrollArea>
         )}
+
+        <Divider my="xs" label="Index Maintenance" labelPosition="left" />
+
+        <Text size="sm" c="dimmed">
+          Remove index entries for files that no longer exist on disk, fix stale
+          paths for moved files, and remove duplicate entries for the same filename.
+        </Text>
+
+        <Group>
+          <Button
+            variant="light"
+            color="orange"
+            loading={cleanupRunning}
+            disabled={cleanupRunning || running}
+            onClick={handleCleanup}
+          >
+            {cleanupRunning ? 'Cleaning up…' : 'Clean up index'}
+          </Button>
+          {cleanupResult && !cleanupResult.error && (
+            <Group gap="xs">
+              <Badge color="teal" variant="light" size="sm">
+                {cleanupResult.fixed_paths} paths fixed
+              </Badge>
+              <Badge color="red" variant="light" size="sm">
+                {cleanupResult.removed_missing} missing removed
+              </Badge>
+              <Badge color="orange" variant="light" size="sm">
+                {cleanupResult.removed_duplicates} duplicates removed
+              </Badge>
+            </Group>
+          )}
+          {cleanupResult?.error && (
+            <Text size="sm" c="red">{cleanupResult.error}</Text>
+          )}
+        </Group>
       </Stack>
     </Modal>
   )

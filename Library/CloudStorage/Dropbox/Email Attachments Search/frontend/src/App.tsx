@@ -25,6 +25,7 @@ import FilePdfsModal from './components/FilePdfsModal'
 import TagMgmt from './components/TagMgmt'
 import StatsPanel from './components/StatsPanel'
 import BulkToolbar from './components/BulkToolbar'
+import UserManualModal from './components/UserManualModal'
 import {
   deleteDocument,
   exportCsv,
@@ -65,6 +66,7 @@ export default function App() {
   const [filePdfsOpen, setFilePdfsOpen] = useState(false)
   const [tagMgmtOpen, setTagMgmtOpen] = useState(false)
   const [statsOpen, setStatsOpen] = useState(false)
+  const [manualOpen, setManualOpen] = useState(false)
   const activeFiltersRef = useRef<SearchFilters>(DEFAULT_FILTERS)
   const resultCountRef = useRef(0)
 
@@ -207,6 +209,7 @@ export default function App() {
                 onExportCsv={() => exportCsv(filters)}
                 onOpenReindex={() => setReindexOpen(true)}
                 onOpenFilePdfs={() => setFilePdfsOpen(true)}
+                onOpenManual={() => setManualOpen(true)}
                 onOpenTagMgmt={() => setTagMgmtOpen(true)}
                 onOpenStats={() => setStatsOpen(true)}
               />
@@ -350,6 +353,11 @@ export default function App() {
       <StatsPanel
         opened={statsOpen}
         onClose={() => setStatsOpen(false)}
+      />
+
+      <UserManualModal
+        opened={manualOpen}
+        onClose={() => setManualOpen(false)}
       />
 
       <Modal

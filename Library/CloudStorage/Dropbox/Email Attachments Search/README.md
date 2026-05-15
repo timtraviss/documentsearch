@@ -1,25 +1,27 @@
 
 # Email Attachments Search
 
-An AI-powered web application to search and quickly locate PDF invoices in your `Email Attachments` folder. The app provides keyword search, an Ask AI conversational mode powered by Claude, and direct PDF previews.
+An AI-powered macOS app to search, tag, and ask questions about PDF documents in your email attachments archive. Features keyword search, an Ask AI conversational mode powered by Claude, and direct PDF previews.
 
 ## Features
 
 ✨ **Three Ways to Find Documents**
 - **Text Search**: Fast keyword matching with filters (company, date, amount, type, year) — always available
 - **AND/OR Filter Mode**: Toggle between matching all criteria or any criteria via the checkbox in advanced filters
-- **Ask AI mode**: Conversational question-answering powered by Claude — ask natural-language questions about your documents, get synthesised answers with source document cards you can click to open the PDF. Requires OpenAI API key (embeddings) and Anthropic API key (answers).
+- **Ask AI mode**: Conversational question-answering powered by Claude — ask natural-language questions like "how much did I pay Genesis in 2025?" and get accurate answers with a breakdown table. Uses dual retrieval: SQL tags for aggregate queries + FAISS vector search for semantic context.
 
 📎 **Document Management**
-- Automatic PDF scanning and indexing
+- Automatic PDF scanning and incremental indexing
 - Text extraction from all PDFs
-- Metadata tracking (filename, path)
+- Tagging system: type, company, year, amount, invoice number, status
+- Bulk tagging, tag rename, CSV export
+- Index Maintenance: fix stale paths, remove missing entries, remove duplicates
 
 🔍 **Smart UI**
-- Clean, intuitive search interface
-- Result snippets for quick preview
-- Direct links to open/download PDFs
-- Responsive design
+- Editorial ink-on-cream theme (DM Serif Display headings, DM Sans body, DM Mono filenames)
+- Ask AI chat with rendered markdown responses (tables, headings, bold)
+- Result cards with PDF thumbnail previews
+- Stats dashboard, Obsidian sidecar export, user manual accessible in-app
 
 ## Quick Start
 
@@ -161,11 +163,11 @@ Email Attachments Search/
 
 | Variable | Required | Description |
 |----------|----------|-------------|
-| `OPENAI_API_KEY` | ❌ No | OpenAI API key for semantic search (get from [openai.com](https://platform.openai.com/api-keys)) |
 | `PDF_FOLDER` | ✅ Yes | Path to your Email Attachments folder |
-| `OBSIDIAN_VAULT` | ❌ No | Path to your Obsidian vault root — enables sidecar export on re-index |
+| `ANTHROPIC_API_KEY` | ✅ For Ask AI | Required for Ask AI conversational mode (answers via Claude) |
+| `OPENAI_API_KEY` | ❌ No | OpenAI API key for semantic embeddings (get from [openai.com](https://platform.openai.com/api-keys)) |
+| `OBSIDIAN_VAULT` | ❌ No | Path to your Obsidian vault root — enables sidecar export on re-index and serves the in-app user manual |
 | `OBSIDIAN_EXPORT_MODE` | ❌ No | `regex` (default) or `claude` — extraction method for sidecar metadata |
-| `ANTHROPIC_API_KEY` | ❌ No | Required only when `OBSIDIAN_EXPORT_MODE=claude` |
 
 ## Troubleshooting
 
@@ -371,6 +373,7 @@ The DB is stored in the Dropbox project folder (`backend/search.db`), giving aut
 
 ## Version History
 
+- **v0.9** — 2026-05-15 — Ask AI improvements: dual retrieval (SQL `tags` table for aggregate financial queries + FAISS vector for semantic context); amount fallback extraction from PDF text when tag amount is empty; markdown rendering in chat responses (tables, headings, bold via react-markdown + remark-gfm); source cards replaced with compact teal badge links; user message bubble legibility fix. UI: DM Sans body font fix (theme.ts was incorrectly using DM Serif Display as body font). PDF serving: fallback filename walk when relative path is stale (fixes 404 on moved files). Index Maintenance: new `/cleanup` endpoint + ReindexModal section — fixes stale paths, removes missing entries and duplicate filenames. User Manual: written to Obsidian vault, served in-app via Tools → User manual.
 - **v0.8.1** — 2026-05-14 — Bug fixes for Ask AI: incremental embedding saves (flushes every 10 docs so crashes don't lose progress); skip individual failed documents instead of aborting; `HAS_EMBEDDINGS` now a dynamic file check (no restart required after building); `backend.embeddings` fallback import for `.app` bundle compatibility; `sync_bundle.sh` now syncs both `dist/` and `/Applications/` automatically; `embeddings.py` added to sync list (was missing)
 - **v0.8** — 2026-05-14 — Ask AI conversational mode: chunked FAISS embeddings (1600-char chunks, 200-char overlap, loaded from SQLite), `/ask` endpoint using Claude `claude-sonnet-4-6` for synthesis, `AskPanel` component with chat history + source document cards + follow-up support, Search/Ask mode toggle in SearchBar, Rebuild Embeddings section in ReindexModal with live log streaming
 - **v0.7** — 2026-05-02 — Obsidian sidecar export (writes `Bills/<year>/YYYY-MM-DD-vendor.md` on re-index with YAML frontmatter + extracted text; regex or Claude extraction mode; result badges in ReindexModal); File Loose PDFs tool (Tools menu → scans PDF folder root and moves unorganised invoices into company subfolders; dry-run mode)

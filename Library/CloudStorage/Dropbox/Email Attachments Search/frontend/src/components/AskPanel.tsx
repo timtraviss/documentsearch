@@ -4,12 +4,12 @@ import {
   Box,
   Button,
   Group,
-  SimpleGrid,
   Text,
   TextInput,
 } from '@mantine/core'
 import { IconRefresh, IconSend } from '@tabler/icons-react'
-import ResultCard from './ResultCard'
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 import { ask } from '../api'
 import type { AskMessage, AskSource, SearchResult } from '../types'
 
@@ -38,11 +38,6 @@ export default function AskPanel({ messages, onMessagesChange, onOpenPdf }: Prop
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages, loading])
-
-  const lastAssistantIndex = messages.reduceRight(
-    (found, msg, i) => (found === -1 && msg.role === 'assistant' ? i : found),
-    -1
-  )
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -102,14 +97,16 @@ export default function AskPanel({ messages, onMessagesChange, onOpenPdf }: Prop
               <Box style={{ display: 'flex', justifyContent: 'flex-end' }}>
                 <Box
                   style={{
-                    background: 'var(--accent)',
-                    color: '#fff',
+                    background: 'var(--ink)',
+                    color: 'var(--card-bg)',
                     borderRadius: '12px 12px 2px 12px',
-                    padding: '0.6rem 1rem',
+                    padding: '0.65rem 1.1rem',
                     maxWidth: '72%',
                   }}
                 >
-                  <Text size="sm">{msg.content}</Text>
+                  <Text size="md" style={{ lineHeight: 1.6, fontFamily: '"DM Sans", system-ui, sans-serif' }}>
+                    {msg.content}
+                  </Text>
                 </Box>
               </Box>
             ) : (
@@ -129,44 +126,27 @@ export default function AskPanel({ messages, onMessagesChange, onOpenPdf }: Prop
                     borderRadius: '2px 12px 12px 12px',
                     padding: '0.75rem 1rem',
                   }}
+                  className="ask-markdown"
                 >
-                  <Text size="sm" style={{ whiteSpace: 'pre-wrap', lineHeight: 1.7 }}>
+                  <ReactMarkdown remarkPlugins={[remarkGfm]}>
                     {msg.content}
-                  </Text>
+                  </ReactMarkdown>
                 </Box>
 
                 {msg.sources && msg.sources.length > 0 && (
-                  <Box mt="sm">
-                    {idx === lastAssistantIndex ? (
-                      <SimpleGrid cols={{ base: 1, sm: 2, lg: 3 }} spacing="sm" mt="xs">
-                        {msg.sources.map((s, si) => (
-                          <ResultCard
-                            key={si}
-                            doc={sourceToResult(s)}
-                            query=""
-                            selected={false}
-                            onToggleSelect={() => {}}
-                            onView={onOpenPdf}
-                            onDelete={() => {}}
-                          />
-                        ))}
-                      </SimpleGrid>
-                    ) : (
-                      <Group gap="xs" mt="xs">
-                        {msg.sources.map((s, si) => (
-                          <Badge
-                            key={si}
-                            variant="light"
-                            color="teal"
-                            style={{ cursor: 'pointer' }}
-                            onClick={() => onOpenPdf(sourceToResult(s))}
-                          >
-                            {s.filename}
-                          </Badge>
-                        ))}
-                      </Group>
-                    )}
-                  </Box>
+                  <Group gap="xs" mt="xs">
+                    {msg.sources.map((s, si) => (
+                      <Badge
+                        key={si}
+                        variant="light"
+                        color="teal"
+                        style={{ cursor: 'pointer' }}
+                        onClick={() => onOpenPdf(sourceToResult(s))}
+                      >
+                        {s.filename}
+                      </Badge>
+                    ))}
+                  </Group>
                 )}
               </Box>
             )}
