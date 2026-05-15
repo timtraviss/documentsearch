@@ -909,6 +909,18 @@ def serve_pdf(filename):
         return Response(data, mimetype="application/pdf",
                         headers={"Content-Disposition": "inline"})
     except FileNotFoundError:
+        # Stale relative path — search the whole PDF_FOLDER by filename
+        basename = os.path.basename(filename)
+        for dirpath, _, files in os.walk(PDF_FOLDER):
+            if basename in files:
+                fallback = os.path.join(dirpath, basename)
+                try:
+                    with open(fallback, "rb") as f:
+                        data = f.read()
+                    return Response(data, mimetype="application/pdf",
+                                    headers={"Content-Disposition": "inline"})
+                except Exception:
+                    break
         return jsonify({"error": "file not found"}), 404
     except PermissionError:
         return jsonify({
