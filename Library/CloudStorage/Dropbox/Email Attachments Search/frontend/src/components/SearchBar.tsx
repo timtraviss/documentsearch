@@ -13,6 +13,7 @@ import {
 } from '@mantine/core'
 import {
   IconAdjustments,
+  IconBook,
   IconChartBar,
   IconFolderSymlink,
   IconRefresh,
@@ -56,6 +57,7 @@ interface Props {
   onOpenTagMgmt: () => void
   onOpenStats: () => void
   onOpenFilePdfs: () => void
+  onOpenManual: () => void
 }
 
 export default function SearchBar({
@@ -73,6 +75,7 @@ export default function SearchBar({
   onOpenTagMgmt,
   onOpenStats,
   onOpenFilePdfs,
+  onOpenManual,
 }: Props) {
   const [showFilters, setShowFilters] = useState(false)
   const [local, setLocal] = useState<SearchFilters>(filters)
@@ -188,6 +191,10 @@ export default function SearchBar({
             </Menu.Item>
             <Menu.Item leftSection={<IconChartBar size={14} />} onClick={onOpenStats}>
               Stats dashboard
+            </Menu.Item>
+            <Menu.Divider />
+            <Menu.Item leftSection={<IconBook size={14} />} onClick={onOpenManual}>
+              User manual
             </Menu.Item>
           </Menu.Dropdown>
         </Menu>

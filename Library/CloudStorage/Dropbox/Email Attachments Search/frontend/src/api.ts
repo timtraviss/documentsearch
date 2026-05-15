@@ -158,6 +158,11 @@ export async function getRebuildEmbeddingsStatus(): Promise<RebuildEmbeddingsSta
   return res.json()
 }
 
+export async function fetchManual(): Promise<{ content?: string; error?: string }> {
+  const res = await fetch('/manual')
+  return res.json().catch(() => ({ error: `Server error ${res.status}` }))
+}
+
 export async function runCleanup(): Promise<CleanupResult> {
   const res = await fetch('/cleanup', { method: 'POST' })
   const data = await res.json().catch(() => ({ error: `Server error ${res.status}` }))

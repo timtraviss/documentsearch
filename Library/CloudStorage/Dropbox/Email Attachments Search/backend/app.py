@@ -966,6 +966,17 @@ def delete_document_route(filename):
     return jsonify({"status": "ok"})
 
 
+@app.route("/manual")
+def get_manual():
+    """Return the user manual markdown from the Obsidian vault (or bundled fallback)."""
+    vault = os.getenv("OBSIDIAN_VAULT", "").strip()
+    manual_path = os.path.join(vault, "Document Search - User Manual.md") if vault else ""
+    if manual_path and os.path.exists(manual_path):
+        with open(manual_path, "r", encoding="utf-8") as f:
+            return jsonify({"content": f.read()})
+    return jsonify({"error": "Manual not found"}), 404
+
+
 @app.route("/cleanup", methods=["POST"])
 def cleanup_index():
     """Remove missing documents and fix stale paths; remove duplicate filename entries."""
