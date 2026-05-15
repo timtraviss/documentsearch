@@ -471,12 +471,19 @@ def _query_tags_structured(conn, company, year) -> list:
         return []
     where = " AND ".join(clauses)
     rows = conn.execute(
-        f"SELECT d.filename, t.company, t.year, t.amount, t.type, t.invoice_number "
+        f"SELECT d.filename, t.company, t.year, t.amount, t.type, t.invoice_number, d.text "
         f"FROM tags t JOIN documents d ON d.relative_path = t.relative_path "
         f"WHERE {where} ORDER BY t.year, d.filename",
         params,
     ).fetchall()
-    return [dict(r) for r in rows]
+    result = []
+    for r in rows:
+        row = dict(r)
+        if not row.get("amount"):
+            row["amount"] = extract_total_amount(row.get("text") or "") or ""
+        del row["text"]
+        result.append(row)
+    return result
 
 
 def _format_structured_block(rows: list) -> str:
