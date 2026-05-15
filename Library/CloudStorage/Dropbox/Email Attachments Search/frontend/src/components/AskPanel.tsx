@@ -97,14 +97,16 @@ export default function AskPanel({ messages, onMessagesChange, onOpenPdf }: Prop
               <Box style={{ display: 'flex', justifyContent: 'flex-end' }}>
                 <Box
                   style={{
-                    background: 'var(--accent)',
-                    color: '#fff',
+                    background: 'var(--ink)',
+                    color: 'var(--card-bg)',
                     borderRadius: '12px 12px 2px 12px',
-                    padding: '0.6rem 1rem',
+                    padding: '0.65rem 1.1rem',
                     maxWidth: '72%',
                   }}
                 >
-                  <Text size="sm">{msg.content}</Text>
+                  <Text size="md" style={{ lineHeight: 1.55, fontFamily: 'var(--mantine-font-family)' }}>
+                    {msg.content}
+                  </Text>
                 </Box>
               </Box>
             ) : (
