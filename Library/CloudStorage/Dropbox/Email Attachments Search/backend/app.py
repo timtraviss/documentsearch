@@ -996,15 +996,23 @@ def cleanup_index():
                     break
 
             if found_at:
-                conn.execute(
-                    "UPDATE documents SET relative_path = ? WHERE id = ?",
-                    (found_at, row["id"]),
-                )
-                conn.execute(
-                    "UPDATE tags SET relative_path = ? WHERE relative_path = ?",
-                    (found_at, row["relative_path"]),
-                )
-                fixed_paths += 1
+                # If the new path is already indexed, the stale row is just a duplicate
+                already_indexed = conn.execute(
+                    "SELECT id FROM documents WHERE relative_path = ?", (found_at,)
+                ).fetchone()
+                if already_indexed:
+                    delete_document(conn, row["relative_path"])
+                    removed_missing += 1
+                else:
+                    conn.execute(
+                        "UPDATE documents SET relative_path = ? WHERE id = ?",
+                        (found_at, row["id"]),
+                    )
+                    conn.execute(
+                        "UPDATE tags SET relative_path = ? WHERE relative_path = ?",
+                        (found_at, row["relative_path"]),
+                    )
+                    fixed_paths += 1
             else:
                 delete_document(conn, row["relative_path"])
                 removed_missing += 1
