@@ -430,6 +430,72 @@ def search():
     return jsonify(results[offset:offset + limit])
 
 
+# ---------------------------------------------------------------------------
+# Ask AI — structured + vector dual retrieval helpers
+# ---------------------------------------------------------------------------
+
+def _parse_amount_float(s: str) -> float:
+    try:
+        return float(re.sub(r"[^0-9.]", "", s or ""))
+    except ValueError:
+        return 0.0
+
+
+def _extract_query_intent(query: str, conn):
+    """Return (company_str_or_None, year_str_or_None) detected in the query."""
+    q_lower = query.lower()
+    year = None
+    for y in range(2020, 2031):
+        if str(y) in q_lower:
+            year = str(y)
+            break
+    companies = [
+        r["company"]
+        for r in conn.execute(
+            "SELECT DISTINCT company FROM tags WHERE company != ''"
+        ).fetchall()
+    ]
+    matched = next((c for c in companies if c.lower() in q_lower), None)
+    return matched, year
+
+
+def _query_tags_structured(conn, company, year) -> list:
+    clauses, params = [], []
+    if company:
+        clauses.append("LOWER(t.company) = ?")
+        params.append(company.lower())
+    if year:
+        clauses.append("t.year = ?")
+        params.append(year)
+    if not clauses:
+        return []
+    where = " AND ".join(clauses)
+    rows = conn.execute(
+        f"SELECT d.filename, t.company, t.year, t.amount, t.type, t.invoice_number "
+        f"FROM tags t JOIN documents d ON d.relative_path = t.relative_path "
+        f"WHERE {where} ORDER BY t.year, d.filename",
+        params,
+    ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def _format_structured_block(rows: list) -> str:
+    if not rows:
+        return ""
+    total = sum(_parse_amount_float(r.get("amount", "")) for r in rows)
+    lines = [
+        "| File | Company | Year | Type | Amount |",
+        "|---|---|---|---|---|",
+    ]
+    for r in rows:
+        lines.append(
+            f"| {r['filename']} | {r['company']} | {r['year']} "
+            f"| {r['type']} | {r['amount']} |"
+        )
+    lines.append(f"\n**Total: ${total:,.2f}** across {len(rows)} document(s).")
+    return "\n".join(lines)
+
+
 @app.route("/ask", methods=["POST"])
 def ask():
     """Conversational question-answering over indexed PDFs using Claude."""
@@ -458,7 +524,17 @@ def ask():
     except Exception as e:
         return jsonify({"error": f"Embedding search failed: {e}"}), 500
 
-    if not chunks:
+    # Structured SQL lookup — runs even if vector search returns nothing
+    try:
+        conn = get_db()
+        matched_company, matched_year = _extract_query_intent(query, conn)
+        structured_rows = _query_tags_structured(conn, matched_company, matched_year)
+        structured_block = _format_structured_block(structured_rows)
+    except Exception:
+        structured_rows = []
+        structured_block = ""
+
+    if not chunks and not structured_rows:
         return jsonify({
             "answer": "I couldn't find any relevant document excerpts for that question.",
             "sources": [],
@@ -469,6 +545,14 @@ def ask():
         f"[Source: {c['filename']}]\n{c['snippet']}" for c in chunks
     ]
     context = "\n---\n".join(context_parts)
+
+    if structured_block:
+        context = (
+            "## Structured Financial Records\n"
+            + structured_block
+            + "\n\n---\n\n## Document Excerpts\n"
+            + context
+        )
 
     # Deduplicate sources list (one entry per PDF path)
     seen_paths: set[str] = set()
@@ -503,9 +587,12 @@ def ask():
             model="claude-sonnet-4-6",
             max_tokens=1024,
             system=(
-                "You are a document assistant. Answer questions based only on the "
-                "document excerpts provided. Cite documents by filename when relevant. "
-                "If the answer is not in the provided excerpts, say so clearly."
+                "You are a document assistant for a personal PDF archive. "
+                "Answer questions based on the provided context. "
+                "When structured financial records are present, use them to calculate "
+                "totals, counts, and summaries — they are authoritative. "
+                "Cite document filenames when relevant. "
+                "If the answer is not in the provided context, say so clearly."
             ),
             messages=anthropic_messages,
         )
