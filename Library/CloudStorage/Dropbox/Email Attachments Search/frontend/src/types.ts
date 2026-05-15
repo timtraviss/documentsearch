@@ -87,6 +87,13 @@ export interface RebuildEmbeddingsStatus {
   error: string | null
 }
 
+export interface CleanupResult {
+  fixed_paths: number
+  removed_missing: number
+  removed_duplicates: number
+  error?: string
+}
+
 export interface SearchFilters {
   q: string
   company: string

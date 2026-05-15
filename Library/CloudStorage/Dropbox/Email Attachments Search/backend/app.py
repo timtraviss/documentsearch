@@ -966,6 +966,87 @@ def delete_document_route(filename):
     return jsonify({"status": "ok"})
 
 
+@app.route("/cleanup", methods=["POST"])
+def cleanup_index():
+    """Remove missing documents and fix stale paths; remove duplicate filename entries."""
+    if not PDF_FOLDER:
+        return jsonify({"error": "PDF_FOLDER not configured"}), 503
+
+    conn = get_db()
+    rows = conn.execute(
+        "SELECT id, relative_path, filename FROM documents"
+    ).fetchall()
+
+    fixed_paths = 0
+    removed_missing = 0
+
+    for row in rows:
+        filepath = _safe_path(PDF_FOLDER, row["relative_path"])
+        if filepath and os.path.exists(filepath):
+            continue  # file is where we expect it
+
+        # Search the whole folder tree by basename
+        basename = os.path.basename(row["relative_path"])
+        found_at = None
+        for dirpath, _, files in os.walk(PDF_FOLDER):
+            if basename in files:
+                candidate = os.path.join(dirpath, basename)
+                # Convert to relative path
+                rel = os.path.relpath(candidate, PDF_FOLDER)
+                found_at = rel
+                break
+
+        if found_at:
+            # Update to the new relative path
+            conn.execute(
+                "UPDATE documents SET relative_path = ? WHERE id = ?",
+                (found_at, row["id"]),
+            )
+            conn.execute(
+                "UPDATE tags SET relative_path = ? WHERE relative_path = ?",
+                (found_at, row["relative_path"]),
+            )
+            fixed_paths += 1
+        else:
+            delete_document(conn, row["relative_path"])
+            removed_missing += 1
+
+    # Remove duplicates: same filename, multiple rows — keep the one that exists on disk
+    dup_rows = conn.execute("""
+        SELECT filename FROM documents
+        GROUP BY filename HAVING COUNT(*) > 1
+    """).fetchall()
+
+    removed_duplicates = 0
+    for dup in dup_rows:
+        entries = conn.execute(
+            "SELECT id, relative_path FROM documents WHERE filename = ? ORDER BY id DESC",
+            (dup["filename"],),
+        ).fetchall()
+
+        # Prefer entries where the file exists
+        keep_id = None
+        for e in entries:
+            p = _safe_path(PDF_FOLDER, e["relative_path"])
+            if p and os.path.exists(p):
+                keep_id = e["id"]
+                break
+        if keep_id is None:
+            keep_id = entries[0]["id"]  # keep newest if none exist
+
+        for e in entries:
+            if e["id"] != keep_id:
+                delete_document(conn, e["relative_path"])
+                removed_duplicates += 1
+
+    conn.commit()
+    return jsonify({
+        "fixed_paths": fixed_paths,
+        "removed_missing": removed_missing,
+        "removed_duplicates": removed_duplicates,
+    })
+
+
 @app.route("/companies")
 def get_companies():
     """Return sorted list of unique company names from tags."""

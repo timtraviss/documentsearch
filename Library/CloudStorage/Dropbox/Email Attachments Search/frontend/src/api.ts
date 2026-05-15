@@ -1,4 +1,4 @@
-import type { SearchFilters, SearchResponse, DocumentTags, Stats, TagValues, ReindexStatus, FilePdfsStatus, StatsBreakdown, AskMessage, AskResponse, RebuildEmbeddingsStatus } from './types'
+import type { SearchFilters, SearchResponse, DocumentTags, Stats, TagValues, ReindexStatus, FilePdfsStatus, StatsBreakdown, AskMessage, AskResponse, RebuildEmbeddingsStatus, CleanupResult } from './types'
 
 const PAGE_SIZE = 20
 
@@ -155,5 +155,10 @@ export async function startRebuildEmbeddings(): Promise<void> {
 export async function getRebuildEmbeddingsStatus(): Promise<RebuildEmbeddingsStatus> {
   const res = await fetch('/rebuild-embeddings/status')
   if (!res.ok) throw new Error('Rebuild embeddings status failed')
+  return res.json()
+}
+
+export async function runCleanup(): Promise<CleanupResult> {
+  const res = await fetch('/cleanup', { method: 'POST' })
   return res.json()
 }
