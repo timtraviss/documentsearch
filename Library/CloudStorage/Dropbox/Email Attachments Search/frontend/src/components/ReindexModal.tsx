@@ -149,10 +149,10 @@ export default function ReindexModal({ opened, onClose, onComplete }: Props) {
     try {
       const result = await runCleanup()
       setCleanupResult(result)
-      onComplete()
+      if (!result.error) onComplete()
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : 'Unknown error'
-      notifications.show({ color: 'red', message: `Cleanup failed: ${msg}` })
+      setCleanupResult({ fixed_paths: 0, removed_missing: 0, removed_duplicates: 0, error: msg })
     } finally {
       setCleanupRunning(false)
     }

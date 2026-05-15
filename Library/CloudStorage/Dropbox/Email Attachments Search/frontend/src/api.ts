@@ -160,5 +160,6 @@ export async function getRebuildEmbeddingsStatus(): Promise<RebuildEmbeddingsSta
 
 export async function runCleanup(): Promise<CleanupResult> {
   const res = await fetch('/cleanup', { method: 'POST' })
-  return res.json()
+  const data = await res.json().catch(() => ({ error: `Server error ${res.status}` }))
+  return data
 }
