@@ -25,9 +25,16 @@ body {
 }
 
 /* Ask AI — rendered markdown inside assistant bubbles */
+.ask-markdown,
+.ask-markdown p,
+.ask-markdown li,
+.ask-markdown td,
+.ask-markdown th,
+.ask-markdown blockquote {
+  font-family: 'DM Sans', system-ui, sans-serif;
+}
 .ask-markdown {
-  font-family: 'DM Sans', sans-serif;
-  font-size: 0.875rem;
+  font-size: 0.9rem;
   line-height: 1.75;
   color: var(--ink);
 }

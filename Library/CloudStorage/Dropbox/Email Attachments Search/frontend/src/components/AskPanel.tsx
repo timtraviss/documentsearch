@@ -104,7 +104,7 @@ export default function AskPanel({ messages, onMessagesChange, onOpenPdf }: Prop
                     maxWidth: '72%',
                   }}
                 >
-                  <Text size="md" style={{ lineHeight: 1.55, fontFamily: 'var(--mantine-font-family)' }}>
+                  <Text size="md" style={{ lineHeight: 1.6, fontFamily: '"DM Sans", system-ui, sans-serif' }}>
                     {msg.content}
                   </Text>
                 </Box>
