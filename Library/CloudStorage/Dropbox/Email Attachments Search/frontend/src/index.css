@@ -23,3 +23,73 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
+
+/* Ask AI — rendered markdown inside assistant bubbles */
+.ask-markdown {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 0.875rem;
+  line-height: 1.75;
+  color: var(--ink);
+}
+.ask-markdown p { margin: 0 0 0.6em; }
+.ask-markdown p:last-child { margin-bottom: 0; }
+.ask-markdown h1, .ask-markdown h2, .ask-markdown h3 {
+  font-family: 'DM Serif Display', serif;
+  font-weight: 400;
+  margin: 0.9em 0 0.3em;
+  color: var(--ink);
+}
+.ask-markdown h1 { font-size: 1.2rem; }
+.ask-markdown h2 { font-size: 1.05rem; }
+.ask-markdown h3 { font-size: 0.95rem; }
+.ask-markdown strong { font-weight: 600; }
+.ask-markdown em { font-style: italic; }
+.ask-markdown ul, .ask-markdown ol {
+  margin: 0.4em 0 0.6em;
+  padding-left: 1.4em;
+}
+.ask-markdown li { margin-bottom: 0.2em; }
+.ask-markdown code {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.82em;
+  background: rgba(13,115,119,0.08);
+  border-radius: 3px;
+  padding: 0.1em 0.35em;
+}
+.ask-markdown pre {
+  background: rgba(26,26,46,0.05);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.75rem 1rem;
+  overflow-x: auto;
+  margin: 0.6em 0;
+}
+.ask-markdown pre code {
+  background: none;
+  padding: 0;
+  font-size: 0.82em;
+}
+.ask-markdown table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 0.6em 0;
+  font-size: 0.82em;
+}
+.ask-markdown th, .ask-markdown td {
+  border: 1px solid var(--border);
+  padding: 0.35em 0.65em;
+  text-align: left;
+}
+.ask-markdown th {
+  background: rgba(13,115,119,0.08);
+  font-weight: 600;
+}
+.ask-markdown tr:nth-child(even) td {
+  background: rgba(26,26,46,0.025);
+}
+.ask-markdown blockquote {
+  border-left: 3px solid var(--accent);
+  margin: 0.5em 0;
+  padding: 0.2em 0.8em;
+  color: var(--ink-muted);
+}
