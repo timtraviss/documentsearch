@@ -2,7 +2,7 @@ const LAT = -36.47509646412374;
 const LNG = 174.73539799623094;
 
 export function initMap() {
-  const map = L.map('map').setView([LAT, LNG], 16);
+  const map = L.map('map').setView([LAT, LNG], 17);
 
   const layers = {
     standard: L.tileLayer(

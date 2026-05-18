@@ -19,7 +19,7 @@ export function initClock() {
         hour:     '2-digit',
         minute:   '2-digit',
         second:   '2-digit',
-        hour12:   true,
+        hour12:   false,
       });
 
     document.getElementById('clock-date').textContent =
@@ -41,10 +41,7 @@ export function initClock() {
   function setSunTimes(sunriseISO, sunsetISO) {
     const fmt = iso => {
       const [, h, m] = iso.match(/T(\d{2}):(\d{2})/);
-      const hour = parseInt(h, 10);
-      const ampm = hour >= 12 ? 'pm' : 'am';
-      const h12  = hour % 12 || 12;
-      return `${String(h12).padStart(2, '0')}:${m} ${ampm}`;
+      return `${h}:${m}`;
     };
 
     document.getElementById('clock-sun').innerHTML = `

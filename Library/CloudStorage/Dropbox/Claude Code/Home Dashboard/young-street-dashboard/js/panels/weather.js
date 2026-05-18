@@ -1,4 +1,4 @@
-import { OPENWEATHER_KEY } from '../config.js';
+import { OPENWEATHER_KEY } from '../../config.js';
 
 const LAT = -36.4751;
 const LNG = 174.7354;
