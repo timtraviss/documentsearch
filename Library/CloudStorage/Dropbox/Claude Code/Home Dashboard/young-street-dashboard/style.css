@@ -207,7 +207,7 @@ body {
 }
 
 /* ----- Weather panel ----- */
-#panel-weather { min-width: 210px; }
+#panel-weather { min-width: 220px; }
 
 .weather-current {
   display: flex;
@@ -222,6 +222,20 @@ body {
 .weather-label  { font-size: 11px; color: var(--text-muted); }
 .weather-wind   { font-size: 11px; color: var(--text-muted); margin-left: auto; }
 
+.weather-details {
+  display: flex;
+  gap: 12px;
+  margin-top: 4px;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.weather-details + .weather-details {
+  margin-top: 3px;
+  padding-top: 3px;
+  border-top: 1px solid rgba(52, 211, 153, 0.08);
+}
+
 .weather-forecast {
   display: flex;
   gap: 8px;
@@ -233,6 +247,7 @@ body {
 .forecast-day      { flex: 1; text-align: center; font-size: 10px; }
 .forecast-date     { color: var(--text-muted); margin-bottom: 3px; }
 .forecast-icon     { font-size: 16px; margin-bottom: 2px; }
+.forecast-pop      { color: var(--text-muted); margin-bottom: 2px; }
 .forecast-temps    { font-weight: 600; }
 
 .weather-unavailable,

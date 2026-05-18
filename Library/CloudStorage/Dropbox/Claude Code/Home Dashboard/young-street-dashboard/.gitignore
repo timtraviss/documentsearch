@@ -1,0 +1,7 @@
+# API keys — create config.js locally, never commit it
+config.js
+.env
+
+.DS_Store
+js/.DS_Store
+plans/.DS_Store
