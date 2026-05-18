@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>11 Young Street</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <div id="map"></div>
+
+  <header class="top-bar">
+    <div id="panel-clock" class="panel"></div>
+    <h1 class="property-title">11 Young Street</h1>
+    <div class="top-right">
+      <button id="theme-toggle" class="theme-btn" aria-label="Toggle theme">☀️</button>
+      <div id="panel-weather" class="panel"></div>
+    </div>
+  </header>
+
+  <div class="bottom-left">
+    <div id="panel-tides" class="panel"></div>
+    <div id="panel-property" class="panel"></div>
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script type="module" src="app.js"></script>
+
+</body>
+</html>

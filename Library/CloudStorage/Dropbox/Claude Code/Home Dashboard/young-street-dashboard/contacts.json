@@ -1,0 +1,228 @@
+{
+  "property": {
+    "address": "11 Young Street, Scotts Landing, Mahurangi East",
+    "builder": "David Reid Homes (DRH)",
+    "coordinates": {
+      "lat": -36.47509646412374,
+      "lng": 174.73539799623094
+    }
+  },
+  "contacts": [
+    {
+      "trade": "Builder",
+      "detail": "",
+      "company": "DRH",
+      "contact": "Glen Vandy",
+      "phone": "021 149 6754",
+      "email": "glen.vandy@davidreidhomes.co.nz"
+    },
+    {
+      "trade": "Electrical",
+      "detail": "Including Lights, Heatpumps and Alarm System",
+      "company": "Bos Electrical",
+      "contact": "Rob Bos",
+      "phone": "09 415 2052",
+      "email": "rob.b@boselectrical.co.nz"
+    },
+    {
+      "trade": "Plumbing",
+      "detail": "Including PVC Downpipes, Leaf Diverters, Water Pump and UV Filter",
+      "company": "Windybank Plumbing & Drainage",
+      "contact": "Rhys Windybank",
+      "phone": "09 447 1141",
+      "email": "windybank@xtra.co.nz"
+    },
+    {
+      "trade": "Drainage",
+      "detail": "",
+      "company": "Windybank Plumbing & Drainage",
+      "contact": "Rhys Windybank",
+      "phone": "09 447 1141",
+      "email": "windybank@xtra.co.nz"
+    },
+    {
+      "trade": "Wastewater system",
+      "detail": "Including UV Filter on system",
+      "company": "Cleartech Installations Limited",
+      "contact": "David Wright",
+      "phone": "021 628 847",
+      "email": "david@cleartechinstallations.co.nz"
+    },
+    {
+      "trade": "Colorsteel Roof",
+      "detail": "",
+      "company": "Metalcraft Industries",
+      "contact": "Eddie Beresford",
+      "phone": "09 444 1813",
+      "email": "eddie.beresford@metalcraftroofing.co.nz"
+    },
+    {
+      "trade": "Louvre Roof and Posts",
+      "detail": "",
+      "company": "Locarno",
+      "contact": "Nick Giblin",
+      "phone": "09 525 2525",
+      "email": "nick@locarno.co.nz"
+    },
+    {
+      "trade": "Metal Spouting and Fascia",
+      "detail": "",
+      "company": "NZ Spouting Services",
+      "contact": "Natalie Fitness",
+      "phone": "0800 444 899",
+      "email": "nzspouting@hotmail.com"
+    },
+    {
+      "trade": "Exterior Windows & Doors",
+      "detail": "",
+      "company": "Vantage Aluminium",
+      "contact": "Sean Carr",
+      "phone": "09 444 7035",
+      "email": "sean.carr@vantagewindows.co.nz"
+    },
+    {
+      "trade": "Skylights",
+      "detail": "",
+      "company": "Velux",
+      "contact": "",
+      "phone": "0800 650 445",
+      "email": ""
+    },
+    {
+      "trade": "Outdoor Fireplace",
+      "detail": "",
+      "company": "Trendz",
+      "contact": "Zoe Lowry",
+      "phone": "0508 252 784",
+      "email": "zoe@trendzoutdoors.co.nz"
+    },
+    {
+      "trade": "Exterior Concrete",
+      "detail": "",
+      "company": "Coast Concepts",
+      "contact": "Andy MacDonald",
+      "phone": "021 108 6220",
+      "email": "info@coastconcepts.co.nz"
+    },
+    {
+      "trade": "Kitchen, Scullery and Laundry cabinetry",
+      "detail": "",
+      "company": "Kitchenmania",
+      "contact": "Laura Arnold",
+      "phone": "09 588 4045",
+      "email": "laura@kitchenmania.co.nz"
+    },
+    {
+      "trade": "Living and Office Cabinetry",
+      "detail": "",
+      "company": "Kitchenmania",
+      "contact": "Laura Arnold",
+      "phone": "09 588 4045",
+      "email": "laura@kitchenmania.co.nz"
+    },
+    {
+      "trade": "Appliances - All F&P Appliances",
+      "detail": "",
+      "company": "Fisher & Paykel",
+      "contact": "Call Centre",
+      "phone": "0800 372 725",
+      "email": "https://www.fisherpaykel.com/nz/help-and-support"
+    },
+    {
+      "trade": "Appliances - Non F&P (Rangehood & Wine Fridge)",
+      "detail": "",
+      "company": "Harvey Norman",
+      "contact": "Call Centre",
+      "phone": "0800 222 699",
+      "email": ""
+    },
+    {
+      "trade": "Interior Doors",
+      "detail": "",
+      "company": "Nationwide Doors",
+      "contact": "Tracey Whimp",
+      "phone": "09 296 0200",
+      "email": "tracey.whimp@nationwideprehung.co.nz"
+    },
+    {
+      "trade": "Interior Door Hardware",
+      "detail": "",
+      "company": "Windsor",
+      "contact": "Call Centre",
+      "phone": "0800 607 028",
+      "email": "https://windsorhardware.co.nz/"
+    },
+    {
+      "trade": "Bathroomware - Hot Water Cylinders",
+      "detail": "",
+      "company": "Mico",
+      "contact": "Peter Chen",
+      "phone": "09 302 7410",
+      "email": "Peter.Chen@mico.co.nz"
+    },
+    {
+      "trade": "Bathroomware - Tapware and Basin Wastes",
+      "detail": "",
+      "company": "Waterware",
+      "contact": "Customer Services",
+      "phone": "09 273 9191",
+      "email": "info@waterware.co.nz"
+    },
+    {
+      "trade": "Bathroomware - Vanities, Bath, Toilets, Heated Towel Rails & Accessories",
+      "detail": "",
+      "company": "Newtech",
+      "contact": "Customer Services",
+      "phone": "0800 728 662",
+      "email": "sales@newtech.co.nz"
+    },
+    {
+      "trade": "Custom Glass Shower Screens and Mirrors",
+      "detail": "",
+      "company": "360 Glass",
+      "contact": "Customer Services",
+      "phone": "0800 360 452",
+      "email": "office@360glass.co.nz"
+    },
+    {
+      "trade": "Duracore Flooring",
+      "detail": "",
+      "company": "Ecodure",
+      "contact": "Nic Blackie",
+      "phone": "09 489 3602",
+      "email": "nic@ecodureflooring.co.nz"
+    },
+    {
+      "trade": "Wardrobe and Cupboard Shelving",
+      "detail": "",
+      "company": "Wardrobes Direct",
+      "contact": "Steve Parkinson",
+      "phone": "021 0733 100",
+      "email": "steve.parkinson@xtra.co.nz"
+    },
+    {
+      "trade": "Tile Supply",
+      "detail": "",
+      "company": "Tile Depot",
+      "contact": "Ruth Morrow",
+      "phone": "09 479 3601",
+      "email": "albany@tiledepot.co.nz"
+    },
+    {
+      "trade": "Tiling",
+      "detail": "",
+      "company": "CS Tiling",
+      "contact": "Chong Yi Sivilay",
+      "phone": "021 630 490",
+      "email": "cs.tiling@hotmail.co.nz"
+    },
+    {
+      "trade": "Painting",
+      "detail": "",
+      "company": "W & S Painting",
+      "contact": "William",
+      "phone": "021 783 454",
+      "email": "williampainters@hotmail.com"
+    }
+  ]
+}
