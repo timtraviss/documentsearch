@@ -1,0 +1,25 @@
+{
+  "address": "11 Young Street, Scotts Landing, 0982",
+  "legal": "Lot 9 DP 89335",
+  "builder": "David Reid Homes (DRH)",
+  "buildYear": null,
+  "rates": {
+    "provider": "Auckland Council",
+    "assessmentNumber": "12340084908",
+    "valuationNumber": "00906-00000007300",
+    "myAucklandPin": "5583"
+  },
+  "valuations": {
+    "asAt": "1 May 2026",
+    "landValue": "$1,670,000",
+    "capitalValue": "$1,690,000"
+  },
+  "utilities": [
+    {
+      "type": "Power",
+      "provider": "Genesis Energy",
+      "customerNumber": "100 378 8281",
+      "phone": "0800 300 400"
+    }
+  ]
+}

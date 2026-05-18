@@ -1,15 +1,18 @@
 export async function initProperty() {
   const container = document.getElementById('panel-property');
 
-  // Load contact data
-  let contacts = [];
-  try {
-    const res = await fetch('contacts.json');
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    contacts = (await res.json()).contacts ?? [];
-  } catch {
-    // Contacts tab will show the empty state
-  }
+  const [contactsResult, propertyResult] = await Promise.allSettled([
+    fetch('contacts.json').then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); }),
+    fetch('property.json').then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); }),
+  ]);
+
+  const contacts = contactsResult.status === 'fulfilled'
+    ? (contactsResult.value.contacts ?? [])
+    : [];
+
+  const property = propertyResult.status === 'fulfilled'
+    ? propertyResult.value
+    : null;
 
   container.innerHTML = `
     <div class="tabs">
@@ -17,12 +20,11 @@ export async function initProperty() {
       <button class="tab"        data-tab="contacts">Contacts</button>
       <button class="tab"        data-tab="documents">Documents</button>
     </div>
-    <div class="tab-content"        id="tab-overview">${renderOverview()}</div>
+    <div class="tab-content"        id="tab-overview">${renderOverview(property)}</div>
     <div class="tab-content hidden" id="tab-contacts">${renderContacts(contacts)}</div>
     <div class="tab-content hidden" id="tab-documents">${renderDocuments()}</div>
   `;
 
-  // Tab switching
   container.querySelectorAll('.tab').forEach(btn => {
     btn.addEventListener('click', () => {
       container.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
@@ -32,34 +34,44 @@ export async function initProperty() {
     });
   });
 
-  // Contacts filter
   const filterInput = container.querySelector('.contacts-filter');
   const contactsList = container.querySelector('.contacts-list');
   if (filterInput) {
     filterInput.addEventListener('input', () => {
-      contactsList.innerHTML = buildContactRows(
-        contacts,
-        filterInput.value.trim()
-      );
+      contactsList.innerHTML = buildContactRows(contacts, filterInput.value.trim());
     });
   }
 }
 
-function renderOverview() {
-  const fields = [
-    ['Address',    '11 Young Street, Scotts Landing, Mahurangi East'],
-    ['Builder',    'David Reid Homes (DRH)'],
-    ['Build year', '—'],
-    ['Section',    '—'],
-    ['Floor area', '—'],
-    ['Rates ref',  '—'],
-  ];
-  return fields.map(([label, value]) => `
+function renderOverview(property) {
+  if (!property) {
+    return '<div class="contacts-empty">Property data unavailable.</div>';
+  }
+
+  const row = (label, value) => `
     <div class="overview-row">
       <span class="overview-label">${label}</span>
-      <span class="overview-value">${value}</span>
+      <span class="overview-value">${value ?? '—'}</span>
     </div>
-  `).join('');
+  `;
+
+  const section = label => `<div class="overview-section">${label}</div>`;
+
+  const utilityRows = (property.utilities ?? []).map(u => row(u.type, u.provider)).join('');
+
+  return [
+    row('Address',    property.address),
+    row('Legal',      property.legal),
+    row('Builder',    property.builder),
+    row('Build year', property.buildYear),
+    section('Rates'),
+    row('Provider',   property.rates?.provider),
+    row('Rates ref',  property.rates?.assessmentNumber),
+    row('Land value', property.valuations?.landValue),
+    row('Cap. value', property.valuations?.capitalValue),
+    utilityRows ? section('Utilities') : '',
+    utilityRows,
+  ].join('');
 }
 
 function renderContacts(contacts) {
@@ -90,7 +102,6 @@ function buildContactRows(contacts, query) {
       ? `<a href="tel:${c.phone.replace(/\s/g, '')}">${c.phone}</a>`
       : '';
 
-    // If the email field is a URL, skip it (per spec) — just show nothing
     const email = c.email && !c.email.startsWith('http')
       ? `<a href="mailto:${c.email}">${c.email}</a>`
       : '';
