@@ -151,6 +151,8 @@ body {
   flex-direction: column;
   align-items: flex-end;
   gap: 8px;
+  max-height: calc(100dvh - 28px);
+  overflow-y: auto;
 }
 
 .btn-row {
@@ -216,21 +218,20 @@ body {
   color: var(--accent);
 }
 
-/* ----- Weather panel ----- */
-#panel-weather { min-width: 220px; }
+/* ----- Weather + Tides right column ----- */
+#panel-weather,
+#panel-tides { width: 260px; }
 
-.weather-current {
+.weather-main {
   display: flex;
   align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
+  gap: 10px;
   line-height: 1;
 }
 
-.weather-icon   { font-size: 22px; }
-.weather-temp   { font-size: 20px; font-weight: 700; }
-.weather-label  { font-size: 11px; color: var(--text-muted); }
-.weather-wind   { font-size: 11px; color: var(--text-muted); margin-left: auto; }
+.weather-icon      { font-size: 28px; }
+.weather-temp      { font-size: 32px; font-weight: 700; }
+.weather-condition { font-size: 13px; color: var(--text-muted); margin-top: 4px; margin-bottom: 2px; }
 
 .weather-details {
   display: flex;
@@ -262,6 +263,22 @@ body {
 
 .weather-unavailable,
 .weather-loading   { font-size: 12px; color: var(--text-muted); }
+
+.weather-wind-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+}
+
+.wind-card-info    { display: flex; flex-direction: column; gap: 2px; }
+.wind-card-speed   { font-size: 18px; font-weight: 700; color: var(--text); line-height: 1; }
+.wind-card-dir     { font-size: 12px; font-weight: 600; color: var(--accent); }
+.wind-card-gust    { font-size: 10px; color: var(--text-muted); margin-top: 2px; }
+
+.wind-compass-svg  { flex-shrink: 0; width: 56px; height: 56px; }
 
 /* ----- Tides panel ----- */
 .tides-header {
@@ -297,6 +314,25 @@ body {
 
 .tide-H { color: var(--accent); font-weight: 700; }
 .tide-L { color: var(--text-muted); }
+
+.tide-past td { opacity: 0.38; }
+.tide-next-row td { color: var(--accent) !important; font-weight: 700; }
+
+.tide-svg { display: block; margin: 6px 0 4px; }
+
+.tide-callout {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 11px;
+  margin-bottom: 6px;
+}
+
+.tide-callout-type   { font-size: 12px; font-weight: 700; }
+.tide-callout-height { font-weight: 600; color: var(--text); }
+.tide-callout-when   { color: var(--text-muted); }
+
+.tides-unavailable { font-size: 12px; color: var(--text-muted); }
 
 /* ----- Property panel ----- */
 #panel-property { max-width: 300px; }

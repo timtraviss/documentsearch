@@ -29,6 +29,7 @@ export function initFloorPlan(map) {
   function initPlanMap() {
     planMap = L.map(bg, {
       crs: L.CRS.Simple,
+      minZoom: -4,
       zoomSnap: 0.1,
       zoomDelta: 0.5,
       attributionControl: false,
@@ -42,7 +43,7 @@ export function initFloorPlan(map) {
     const url = `plans/page-${String(currentPage).padStart(2, '0')}.png`;
     if (overlay) planMap.removeLayer(overlay);
     overlay = L.imageOverlay(url, IMG_BOUNDS).addTo(planMap);
-    planMap.fitBounds(IMG_BOUNDS, { padding: [10, 10] });
+    planMap.fitBounds(IMG_BOUNDS, { padding: [20, 20] });
     pageLabel.textContent = `${currentPage} / ${pageCount}`;
     prevBtn.disabled = currentPage === 1;
     nextBtn.disabled = currentPage === pageCount;
@@ -57,7 +58,10 @@ export function initFloorPlan(map) {
     toggleBtn.title = 'Switch to map';
     if (!planMap) {
       initPlanMap();
-      requestAnimationFrame(() => showPage(currentPage));
+      setTimeout(() => {
+        planMap.invalidateSize();
+        showPage(currentPage);
+      }, 50);
     } else {
       planMap.invalidateSize();
       showPage(currentPage);

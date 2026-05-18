@@ -22,6 +22,26 @@ function windDir(deg) {
   return ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'][Math.round(deg / 45) % 8];
 }
 
+function windCompassSVG(deg) {
+  return `
+    <svg class="wind-compass-svg" viewBox="0 0 56 56" width="56" height="56" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="28" cy="28" r="26" fill="none" stroke="rgba(52,211,153,0.18)" stroke-width="1"/>
+      <line x1="28" y1="2"  x2="28" y2="8"  stroke="rgba(52,211,153,0.35)" stroke-width="1"/>
+      <line x1="28" y1="48" x2="28" y2="54" stroke="rgba(52,211,153,0.35)" stroke-width="1"/>
+      <line x1="2"  y1="28" x2="8"  y2="28" stroke="rgba(52,211,153,0.35)" stroke-width="1"/>
+      <line x1="48" y1="28" x2="54" y2="28" stroke="rgba(52,211,153,0.35)" stroke-width="1"/>
+      <text x="28" y="8"  text-anchor="middle" dominant-baseline="middle" font-size="7" fill="rgba(237,242,247,0.6)">N</text>
+      <text x="49" y="29" text-anchor="middle" dominant-baseline="middle" font-size="7" fill="rgba(237,242,247,0.4)">E</text>
+      <text x="28" y="50" text-anchor="middle" dominant-baseline="middle" font-size="7" fill="rgba(237,242,247,0.4)">S</text>
+      <text x="7"  y="29" text-anchor="middle" dominant-baseline="middle" font-size="7" fill="rgba(237,242,247,0.4)">W</text>
+      <g transform="rotate(${deg}, 28, 28)">
+        <polygon points="28,6 24.5,22 31.5,22" fill="#34d399"/>
+        <rect x="26.5" y="22" width="3" height="20" rx="1.5" fill="rgba(237,242,247,0.25)"/>
+      </g>
+    </svg>
+  `;
+}
+
 function uvLabel(uvi) {
   if (uvi <= 2)  return 'Low';
   if (uvi <= 5)  return 'Mod';
@@ -119,30 +139,36 @@ export async function initWeather(clock) {
       </div>
     `).join('');
 
-    const gust = cur.wind.gust
-      ? `<span>Gust ${Math.round(cur.wind.gust * 3.6)} km/h</span>`
-      : '';
+    const speedKmh = Math.round(cur.wind.speed * 3.6);
+    const gustKmh  = cur.wind.gust ? Math.round(cur.wind.gust * 3.6) : null;
+    const dir      = windDir(cur.wind.deg);
 
     const uviHTML = uvi !== null
       ? `<span>UV ${uvi} · ${uvLabel(uvi)}</span>`
       : '';
 
     container.innerHTML = `
-      <div class="weather-current">
+      <div class="weather-main">
         <span class="weather-icon">${owIcon(cond.id)}</span>
         <span class="weather-temp">${Math.round(cur.main.temp)}°C</span>
-        <span class="weather-label">${label}</span>
-        <span class="weather-wind">💨 ${Math.round(cur.wind.speed * 3.6)} km/h ${windDir(cur.wind.deg)}</span>
       </div>
+      <div class="weather-condition">${label}</div>
       <div class="weather-details">
-        <span>Feels ${Math.round(cur.main.feels_like)}°</span>
-        <span>💧 ${cur.main.humidity}%</span>
-        <span>☁️ ${cur.clouds.all}%</span>
+        <span>Feels like ${Math.round(cur.main.feels_like)}°</span>
+        <span>Humidity ${cur.main.humidity}%</span>
+        <span>Cloud ${cur.clouds.all}%</span>
       </div>
       <div class="weather-details">
         ${uviHTML}
         <span>🌡 ${cur.main.pressure} hPa</span>
-        ${gust}
+      </div>
+      <div class="weather-wind-card">
+        <div class="wind-card-info">
+          <div class="wind-card-speed">${speedKmh} km/h</div>
+          <div class="wind-card-dir">${dir}</div>
+          ${gustKmh ? `<div class="wind-card-gust">Gust ${gustKmh} km/h</div>` : ''}
+        </div>
+        ${windCompassSVG(cur.wind.deg)}
       </div>
       <div class="weather-forecast">${forecastHTML}</div>
     `;
