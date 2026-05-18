@@ -2,6 +2,13 @@
    11 Young Street — Stylesheet
    ============================================================ */
 
+@font-face {
+  font-family: 'Electrolize';
+  src: url('fonts/Electrolize-Regular.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+}
+
 /* ----- Reset ----- */
 *, *::before, *::after {
   box-sizing: border-box;
@@ -183,22 +190,25 @@ body {
 .theme-btn:hover { filter: brightness(1.15); }
 
 /* ----- Clock panel ----- */
-#panel-clock { min-width: 170px; }
+#panel-clock { width: 300px; }
 
 .clock-time {
+  font-family: 'Electrolize', monospace;
   font-size: 26px;
-  font-weight: 700;
-  letter-spacing: -0.5px;
+  font-weight: 400;
+  letter-spacing: 0.5px;
   line-height: 1;
 }
 
 .clock-date {
+  font-family: 'Electrolize', monospace;
   font-size: 11px;
   color: var(--text-muted);
   margin-top: 4px;
 }
 
 .clock-sun {
+  font-family: 'Electrolize', monospace;
   display: flex;
   gap: 14px;
   margin-top: 8px;
