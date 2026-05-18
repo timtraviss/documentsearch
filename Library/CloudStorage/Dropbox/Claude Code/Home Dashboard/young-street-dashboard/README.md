@@ -1,12 +1,10 @@
 # 11 Young Street — Property Dashboard
 
-A personal property dashboard for 11 Young Street, Scotts Landing, Mahurangi East, NZ. Built as a local web app: no build step, no npm, no server required.
+A personal property dashboard for 11 Young Street, Scotts Landing, Mahurangi East, NZ. Built as a local web app: no build step, no npm, no server required beyond serving ES modules.
 
 ## How to open
 
-**Safari:** Open `index.html` directly from Finder — ES modules work on `file://`.
-
-**Chrome / other browsers:** ES modules require a local server:
+**Requires a local server** (ES modules + `fetch()` don't work on `file://`):
 
 ```bash
 cd young-street-dashboard
@@ -15,50 +13,94 @@ python3 -m http.server 8080
 
 Then open `http://localhost:8080`.
 
+**API key:** Create `config.js` in the dashboard root (gitignored):
+
+```js
+export const OPENWEATHER_KEY = 'your_key_here';
+```
+
 ---
 
-## V1 — What was built
+## What's built
 
 ### Map
-- Full-screen interactive map (Leaflet.js 1.9.4) centred on the property
+- Full-screen interactive map (Leaflet.js 1.9.4) centred on the property at zoom 17
 - Three tile layers switchable via bottom-right control:
-  - **Satellite** — Esri World Imagery (default in dark mode)
-  - **Standard** — OpenStreetMap (default in light mode)
+  - **Satellite** — Esri World Imagery (default)
+  - **Standard** — OpenStreetMap
   - **Topographic** — OpenTopoMap
 - Property marker with popup
 
+### Floor plan viewer
+- Toggle between map and floor plan via the 📐 button (top-right)
+- PDF pages converted to PNG via `convert-plans.py` (PyMuPDF) and stored in `plans/`
+- Pan and zoom with Leaflet CRS.Simple; keyboard arrow keys page through plans
+- Page count stored in `property.json` — the toggle button is hidden if no plans are present
+
 ### Theme
-- Dark / light toggle (top-right ☀️ / 🌙 button)
+- Dark / light toggle (top-right button)
 - Emerald green accent (`#34d399`) throughout
 - Frosted-glass panels using `backdrop-filter: blur()`
-- Theme switch auto-swaps map layer (satellite ↔ standard); manual layer picks are respected and skip the next auto-swap
+- Theme switch auto-swaps map layer; manual layer picks are respected
 
 ### Clock panel (top-left)
-- Live time and date, Auckland timezone
-- Sunrise / sunset times populated by the weather fetch (Open-Meteo, already NZ local time — parsed with regex to avoid browser timezone bugs)
+- Live time and date, Auckland timezone, 24-hour format
+- Electrolize monospace font
+- Sunrise / sunset times shown with SVG icons — populated by the weather fetch
 
 ### Weather panel (top-right)
-- Current temperature, WMO weather condition (emoji + label), wind speed (km/h)
-- 3-day forecast strip (icon, high/low temps)
-- Data source: Open-Meteo API — free, no key required
-- Graceful degradation: shows "Weather unavailable" if the fetch fails
+- Current temperature, condition (emoji + label), feels-like, humidity, cloud cover
+- UV index and pressure
+- Wind speed, direction, and gust — with an animated SVG compass rose
+- 3-day forecast strip
+- Data source: OpenWeather API 2.5 (key required in `config.js`)
 
-### Tides panel (bottom-left)
-- Static reference tides for Mahurangi (H/L times and heights)
-- Clearly labelled as approximate; placeholder for future live NIWA data
+### Tides panel (top-right, below weather)
+- Smooth cosine-interpolated SVG tide curve for the current Auckland day
+- "Now" marker (white dot + dashed line) showing current position in the tide cycle
+- Next tide callout: type, height, and countdown
+- Compact H/L table below the chart; past tides dimmed, next tide highlighted
+- Data source: NIWA CSV (`tides_31days_from_19May.csv`) — update this file periodically
 
-### Property panel (bottom-left, below tides)
+### Property panel (bottom-left)
 Three tabs:
 
 | Tab | Contents |
 |-----|----------|
-| Overview | Address, builder (David Reid Homes), and placeholder fields (build year, section, floor area, rates ref) |
-| Contacts | 27 trade/supplier contacts loaded from `contacts.json`; live search filter by trade, company, or name; phone `tel:` links and email `mailto:` links |
-| Documents | Reserved — placeholder text |
+| Overview | Address, legal description, builder, build year, rates details, valuations, utilities |
+| Contacts | Trade/supplier contacts from `contacts.json`; live search; phone and email links |
+| Documents | Link to the Dropbox `11 Young Street` folder |
 
-### Responsive layout
-- Desktop: map fills screen, panels float over it
-- Mobile (≤ 640 px): map pinned to 50 vh, panels stack below in a scrollable page
+All property data lives in `property.json` — edit it there, not in the code.
+
+---
+
+## File structure
+
+```
+young-street-dashboard/
+├── index.html
+├── app.js
+├── style.css
+├── config.js              ← gitignored — add your OpenWeather key here
+├── property.json          ← all property data
+├── contacts.json          ← trade/supplier contacts
+├── tides_31days_from_19May.csv  ← NIWA tide data (refresh periodically)
+├── convert-plans.py       ← converts PDF floor plans to plans/*.png
+├── fonts/
+│   └── Electrolize-Regular.ttf
+├── plans/                 ← generated PNG pages (gitignored)
+│   └── page-01.png …
+└── js/
+    ├── map.js
+    ├── theme.js
+    ├── floorplan.js
+    └── panels/
+        ├── clock.js
+        ├── weather.js
+        ├── tides.js
+        └── property.js
+```
 
 ---
 
@@ -66,45 +108,39 @@ Three tabs:
 
 | Layer | Choice |
 |-------|--------|
-| Map | Leaflet.js 1.9.4 (CDN) |
-| Weather | Open-Meteo API (free, no key) |
-| Tides | Static data (live NIWA API planned) |
+| Map / floor plan | Leaflet.js 1.9.4 (CDN) |
+| Weather | OpenWeather API 2.5 (key required) |
+| Tides | NIWA CSV — cosine-interpolated SVG chart |
+| Font | Electrolize (local TTF) |
 | Styling | Vanilla CSS with custom properties |
 | JS | Vanilla ES modules — no bundler |
-| Hosting | Local file / any static host |
+| Hosting | Local server (`python3 -m http.server`) |
+
+---
+
+## Updating tide data
+
+1. Go to [NIWA Tide Forecaster](https://tides.niwa.co.nz) — use coordinates `-36.48, 174.734`, export as CSV
+2. Replace `tides_31days_from_19May.csv` with the new file
+3. Update the `CSV_PATH` constant at the top of `js/panels/tides.js` to match the new filename
+
+## Updating floor plans
+
+```bash
+# Place the PDF in the parent folder as 11_Young_Street_plans.pdf, then:
+python3 convert-plans.py
+```
+
+This exports each page to `plans/page-XX.png` and updates `property.json` with the page count.
 
 ---
 
 ## Future improvements
 
-### Live tides
-NIWA's Tide API requires a key and does not support direct browser requests (CORS). A lightweight server-side proxy (e.g. a Cloudflare Worker or Vercel function) is needed to fetch and relay tide data. Store the key in `.env` (see `.env.example`).
-
-### Persistent theme preference
-Save the user's last-chosen theme to `localStorage` so it survives page reloads.
-
-### Property overview — fill in the blanks
-Once confirmed, populate: build year, section area, floor area, Auckland Council rates reference number, and LIM/title links.
-
-### Documents tab
-Add links or embedded previews for: council LIM, title documents, DRH warranty, Healthy Homes compliance certificate, insurance policy summary.
-
-### Live contacts
-Replace the static `contacts.json` with a small managed data source (e.g. a private Google Sheet via Apps Script, or a JSON file hosted in Dropbox with a public link) so contacts can be updated without touching code.
-
-### Hosting
-Deploy to a static host (Vercel, Netlify, Cloudflare Pages) for tablet/phone access without running a local server. Keep it private (password or IP allow-list).
-
-### Tide graph
-Replace the tabular tide display with a 24-hour curve chart (Chart.js or a small SVG path) once the live API proxy is in place.
-
-### AI chat panel
-A floating chat interface connected to Claude API for property-related Q&A (maintenance history, supplier lookups, council queries). Requires a backend for the API key.
-
-### Weather extras
-- Rainfall amount (mm) from Open-Meteo `precipitation` field
-- UV index
-- Wind direction (compass bearing)
-
-### Offline / PWA
-Add a Service Worker and web app manifest so the dashboard loads from cache when the internet is unavailable.
+- **Mapbox** — custom dark map style matching the dashboard theme; sharper satellite imagery
+- **Persistent theme** — save last-chosen theme to `localStorage`
+- **Tide data automation** — script to fetch and replace the CSV on a schedule
+- **Documents tab** — links or previews for LIM, title, DRH warranty, insurance summary
+- **Hosting** — deploy to Vercel/Netlify/Cloudflare Pages for tablet access without a local server
+- **AI chat panel** — Claude API for property Q&A (maintenance history, supplier lookups)
+- **PWA / offline** — Service Worker so the dashboard loads from cache without internet
