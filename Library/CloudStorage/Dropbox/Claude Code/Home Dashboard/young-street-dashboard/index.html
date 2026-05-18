@@ -12,11 +12,16 @@
 
   <div id="map"></div>
 
+  <div id="floor-plan-bg" class="hidden"></div>
+
   <header class="top-bar">
     <div id="panel-clock" class="panel"></div>
     <h1 class="property-title">11 Young Street</h1>
     <div class="top-right">
-      <button id="theme-toggle" class="theme-btn" aria-label="Toggle theme">☀️</button>
+      <div class="btn-row">
+        <button id="view-toggle" class="theme-btn hidden" title="Switch to floor plans">📐</button>
+        <button id="theme-toggle" class="theme-btn" aria-label="Toggle theme">☀️</button>
+      </div>
       <div id="panel-weather" class="panel"></div>
     </div>
   </header>
@@ -25,6 +30,12 @@
     <div id="panel-tides" class="panel"></div>
     <div id="panel-property" class="panel"></div>
   </div>
+
+  <nav id="floor-plan-nav" class="floor-plan-nav panel hidden">
+    <button id="floor-plan-prev" class="floor-plan-btn" disabled>&#8249;</button>
+    <span id="floor-plan-page" class="floor-plan-page">1 / 1</span>
+    <button id="floor-plan-next" class="floor-plan-btn">&#8250;</button>
+  </nav>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script type="module" src="app.js"></script>

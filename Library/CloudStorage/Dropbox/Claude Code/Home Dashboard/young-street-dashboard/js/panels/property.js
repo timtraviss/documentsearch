@@ -22,7 +22,7 @@ export async function initProperty() {
     </div>
     <div class="tab-content"        id="tab-overview">${renderOverview(property)}</div>
     <div class="tab-content hidden" id="tab-contacts">${renderContacts(contacts)}</div>
-    <div class="tab-content hidden" id="tab-documents">${renderDocuments()}</div>
+    <div class="tab-content hidden" id="tab-documents">${renderDocuments(property)}</div>
   `;
 
   container.querySelectorAll('.tab').forEach(btn => {
@@ -117,11 +117,17 @@ function buildContactRows(contacts, query) {
   }).join('');
 }
 
-function renderDocuments() {
+function renderDocuments(property) {
+  const folder = property?.documentsFolder;
   return `
+    ${folder ? `
+      <a class="docs-folder-link" href="${folder}" target="_blank">
+        <span class="docs-folder-icon">📁</span>
+        <span>Open 11 Young Street folder</span>
+      </a>
+    ` : ''}
     <p class="docs-note">
-      This tab is reserved for future use — warranty documents,
-      council links, and other property records.
+      Warranty documents, council links, and other property records.
     </p>
   `;
 }

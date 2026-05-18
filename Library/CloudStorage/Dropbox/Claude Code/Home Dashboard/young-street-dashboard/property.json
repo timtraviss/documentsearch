@@ -14,6 +14,7 @@
     "landValue": "$1,670,000",
     "capitalValue": "$1,690,000"
   },
+  "documentsFolder": "file:///Users/timothytraviss/Library/CloudStorage/Dropbox/11%20Young%20Street/",
   "utilities": [
     {
       "type": "Power",
@@ -21,5 +22,8 @@
       "customerNumber": "100 378 8281",
       "phone": "0800 300 400"
     }
-  ]
+  ],
+  "floorPlan": {
+    "pageCount": 15
+  }
 }
