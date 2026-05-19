@@ -119,36 +119,34 @@ function buildContactCards(contacts, query) {
 }
 
 function renderDocuments(property) {
+  const docs   = property?.documents ?? [];
   const folder = property?.documentsFolder;
+
   const DOC_SVG = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>`;
 
-  const docs = [
-    { name: 'LIM Report',             info: 'Auckland Council' },
-    { name: 'Title & Easements',      info: 'LINZ' },
-    { name: 'DRH Build Documents',    info: 'David Reid Homes' },
-    { name: 'Insurance Summary',      info: 'AMI' },
-    ...(property?.floorPlan?.pageCount ? [{ name: 'Floor Plans', info: 'PNG · on device' }] : []),
-  ];
+  if (docs.length === 0) return '<div class="contacts-empty">No documents listed.</div>';
 
-  return `
-    <div style="display:flex;flex-direction:column;gap:6px">
-      ${docs.map(d => `
-        <div class="doc">
-          <div class="icon">${DOC_SVG}</div>
-          <div class="meta">
-            <div class="name">${d.name}</div>
-            <div class="info">${d.info}</div>
-          </div>
-        </div>
-      `).join('')}
-      ${folder ? `
-        <a class="doc" href="${folder}" target="_blank" style="text-decoration:none">
-          <div class="icon" style="font-size:16px">📁</div>
-          <div class="meta">
-            <div class="name">Open Dropbox Folder</div>
-            <div class="info">All property documents</div>
-          </div>
-        </a>` : ''}
-    </div>
-  `;
+  const cards = docs.map(d => {
+    const inner = `
+      <div class="icon">${DOC_SVG}</div>
+      <div class="meta">
+        <div class="name">${d.name}</div>
+        <div class="info">${d.category ?? ''}</div>
+      </div>`;
+
+    return d.url
+      ? `<a class="doc" href="${d.url}" target="_blank" rel="noopener" style="text-decoration:none">${inner}</a>`
+      : `<div class="doc doc-inactive">${inner}</div>`;
+  }).join('');
+
+  const folderLink = folder ? `
+    <a class="doc" href="${folder}" target="_blank" rel="noopener" style="text-decoration:none;margin-top:4px">
+      <div class="icon" style="font-size:16px">📁</div>
+      <div class="meta">
+        <div class="name">Open Dropbox Folder</div>
+        <div class="info">All property documents</div>
+      </div>
+    </a>` : '';
+
+  return `<div style="display:flex;flex-direction:column;gap:6px">${cards}${folderLink}</div>`;
 }

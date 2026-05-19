@@ -29,6 +29,13 @@
       "phone": ""
     }
   ],
+  "documents": [
+    { "name": "LIM Report",          "category": "Auckland Council", "url": "" },
+    { "name": "Title & Easements",   "category": "LINZ",             "url": "" },
+    { "name": "DRH Build Documents", "category": "David Reid Homes", "url": "" },
+    { "name": "Insurance Summary",   "category": "AMI",              "url": "" },
+    { "name": "Code of Compliance",  "category": "Auckland Council", "url": "" }
+  ],
   "floorPlan": {
     "pageCount": 15
   }

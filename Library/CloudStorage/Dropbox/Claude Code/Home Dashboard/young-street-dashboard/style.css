@@ -467,6 +467,8 @@ html.light .prop-search {
   transition: all 0.12s;
 }
 .doc:hover { background: var(--accent-soft); border-color: var(--glass-border); }
+.doc-inactive { cursor: default; opacity: 0.45; }
+.doc-inactive:hover { background: transparent; border-color: transparent; }
 .doc .icon {
   width: 28px; height: 28px;
   border-radius: 6px;
