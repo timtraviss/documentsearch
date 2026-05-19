@@ -22,6 +22,43 @@ PROPERTY_JSON = os.path.abspath(
     os.path.join(os.path.dirname(__file__), '..', 'property.json')
 )
 
+_index_state = {
+    'running':      False,
+    'progress':     '',
+    'log':          [],
+    'error':        None,
+}
+
+
+def _run_index(folder):
+    _index_state['running'] = True
+    _index_state['log'] = []
+    _index_state['error'] = None
+
+    def log(msg):
+        _index_state['log'].append(msg)
+        _index_state['progress'] = msg
+
+    try:
+        from database import init_db, get_all_documents_with_text
+        from indexer import scan_pdfs
+        from embeddings import build_embeddings
+
+        init_db()
+        log('Scanning PDFs...')
+        indexed, skipped = scan_pdfs(folder, progress_callback=log)
+        log(f'Indexed {indexed} new, skipped {skipped} unchanged')
+
+        log('Building embeddings...')
+        docs = get_all_documents_with_text()
+        build_embeddings(docs, progress_callback=log)
+        log('Complete')
+    except Exception as exc:
+        _index_state['error'] = str(exc)
+        log(f'ERROR: {exc}')
+    finally:
+        _index_state['running'] = False
+
 
 @app.route('/')
 def index():
@@ -94,6 +131,41 @@ def api_ask():
             })
 
     return jsonify({'answer': answer, 'sources': sources})
+
+
+@app.route('/api/index', methods=['POST'])
+def api_index():
+    from flask import request
+    if _index_state['running']:
+        return jsonify({'status': 'already_running'}), 409
+
+    folder = os.environ.get('DOCUMENTS_FOLDER', '').strip()
+    if not folder or not os.path.isdir(folder):
+        return jsonify({'error': 'DOCUMENTS_FOLDER not set or not a valid directory'}), 500
+
+    thread = threading.Thread(target=_run_index, args=(folder,), daemon=True)
+    thread.start()
+    return jsonify({'status': 'started'})
+
+
+@app.route('/api/index/status')
+def api_index_status():
+    from database import get_document_count, get_last_indexed
+    try:
+        doc_count    = get_document_count()
+        last_indexed = get_last_indexed()
+    except Exception:
+        doc_count    = 0
+        last_indexed = None
+
+    return jsonify({
+        'running':      _index_state['running'],
+        'progress':     _index_state['progress'],
+        'log':          list(_index_state['log'][-5:]),
+        'error':        _index_state['error'],
+        'doc_count':    doc_count,
+        'last_indexed': last_indexed,
+    })
 
 
 @app.route('/<path:path>')
