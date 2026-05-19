@@ -1,91 +1,126 @@
-// All pages exported at 2382×1684 px — used to set Leaflet image bounds.
-const IMG_W = 2382;
-const IMG_H = 1684;
-const IMG_BOUNDS = [[0, 0], [IMG_H, IMG_W]];
+const FLOOR_PLAN_NAMES = ['Ground Floor', 'Upper Floor', 'Site Plan'];
 
 export function initFloorPlan(map) {
-  const toggleBtn = document.getElementById('view-toggle');
-  const mapEl     = document.getElementById('map');
-  const bg        = document.getElementById('floor-plan-bg');
-  const nav       = document.getElementById('floor-plan-nav');
-  const pageLabel = document.getElementById('floor-plan-page');
-  const prevBtn   = document.getElementById('floor-plan-prev');
-  const nextBtn   = document.getElementById('floor-plan-next');
+  const btnFloorPlan = document.getElementById('btn-floorplan');
+  const stage        = document.getElementById('floorplan-stage');
+  const canvas       = document.getElementById('floorplan-canvas');
+  const mapEl        = document.getElementById('map');
+  const vignetteEl   = document.getElementById('vignette');
+  const pager        = document.getElementById('fp-pager');
+  const zoom         = document.getElementById('fp-zoom');
+  const fpNum        = document.getElementById('fp-num');
+  const fpTotal      = document.getElementById('fp-total');
+  const fpName       = document.getElementById('fp-name');
+  const prevBtn      = document.getElementById('fp-prev');
+  const nextBtn      = document.getElementById('fp-next');
+  const zoomInBtn    = document.getElementById('fp-zoomin');
+  const zoomOutBtn   = document.getElementById('fp-zoomout');
+  const resetBtn     = document.getElementById('fp-reset');
+
+  const MAP_SVG = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polygon points="1 6 8 3 16 6 23 3 23 18 16 21 8 18 1 21 1 6"/><line x1="8" y1="3" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="21"/></svg>`;
+  const PLAN_SVG = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="1"/><path d="M3 11h18M11 3v18"/></svg>`;
 
   let pageCount   = 0;
-  let currentPage = 1;
+  let currentPage = 0;
   let planActive  = false;
-  let planMap     = null;
-  let overlay     = null;
+  let tf = { x: 0, y: 0, scale: 0.55 };
+  let drag = null;
+
+  function applyTransform() {
+    canvas.style.transform = `translate(-50%, -50%) scale(${tf.scale}) translate(${tf.x}px, ${tf.y}px)`;
+  }
+
+  function resetTransform() {
+    tf = { x: -600, y: -400, scale: 0.55 };
+    applyTransform();
+  }
 
   fetch('property.json')
     .then(r => r.json())
     .then(data => {
       pageCount = data?.floorPlan?.pageCount ?? 0;
-      if (pageCount > 0) toggleBtn.classList.remove('hidden');
+      fpTotal.textContent = pageCount;
+      if (pageCount > 0) {
+        btnFloorPlan.classList.remove('hidden');
+        btnFloorPlan.innerHTML = PLAN_SVG;
+      }
     })
     .catch(() => {});
 
-  function initPlanMap() {
-    planMap = L.map(bg, {
-      crs: L.CRS.Simple,
-      minZoom: -4,
-      zoomSnap: 0.1,
-      zoomDelta: 0.5,
-      attributionControl: false,
-      zoomControl: false,
-    });
-    L.control.zoom({ position: 'bottomright' }).addTo(planMap);
-  }
-
   function showPage(n) {
-    currentPage = Math.max(1, Math.min(n, pageCount));
-    const url = `plans/page-${String(currentPage).padStart(2, '0')}.png`;
-    if (overlay) planMap.removeLayer(overlay);
-    overlay = L.imageOverlay(url, IMG_BOUNDS).addTo(planMap);
-    planMap.fitBounds(IMG_BOUNDS, { padding: [20, 20] });
-    pageLabel.textContent = `${currentPage} / ${pageCount}`;
-    prevBtn.disabled = currentPage === 1;
-    nextBtn.disabled = currentPage === pageCount;
+    currentPage = Math.max(0, Math.min(n, pageCount - 1));
+    const url = `plans/page-${String(currentPage + 1).padStart(2, '0')}.png`;
+    canvas.innerHTML = `<img src="${url}" alt="Floor plan page ${currentPage + 1}" style="display:block;max-width:none">`;
+    fpNum.textContent = currentPage + 1;
+    fpName.textContent = FLOOR_PLAN_NAMES[currentPage] ?? `Page ${currentPage + 1}`;
+    prevBtn.disabled = currentPage === 0;
+    nextBtn.disabled = currentPage === pageCount - 1;
+    resetTransform();
   }
 
-  function showPlans() {
+  function enterFloorPlan() {
     planActive = true;
     mapEl.style.display = 'none';
-    bg.classList.remove('hidden');
-    nav.classList.remove('hidden');
-    toggleBtn.textContent = '🗺';
-    toggleBtn.title = 'Switch to map';
-    if (!planMap) {
-      initPlanMap();
-      setTimeout(() => {
-        planMap.invalidateSize();
-        showPage(currentPage);
-      }, 50);
-    } else {
-      planMap.invalidateSize();
-      showPage(currentPage);
-    }
+    if (vignetteEl) vignetteEl.style.display = 'none';
+    stage.classList.add('visible');
+    pager.classList.remove('hidden');
+    zoom.classList.remove('hidden');
+    btnFloorPlan.innerHTML = MAP_SVG;
+    btnFloorPlan.classList.add('active');
+    showPage(currentPage);
   }
 
-  function showMap() {
+  function exitFloorPlan() {
     planActive = false;
-    bg.classList.add('hidden');
-    nav.classList.add('hidden');
+    stage.classList.remove('visible');
+    pager.classList.add('hidden');
+    zoom.classList.add('hidden');
     mapEl.style.display = '';
-    toggleBtn.textContent = '📐';
-    toggleBtn.title = 'Switch to floor plans';
+    // Restore vignette if state says it should be visible
+    import('./state.js').then(({ state }) => {
+      if (vignetteEl) vignetteEl.style.display = state.vignette ? '' : 'none';
+    });
+    btnFloorPlan.innerHTML = PLAN_SVG;
+    btnFloorPlan.classList.remove('active');
     map.invalidateSize();
   }
 
-  toggleBtn.addEventListener('click', () => planActive ? showMap() : showPlans());
-  prevBtn.addEventListener('click',   () => showPage(currentPage - 1));
-  nextBtn.addEventListener('click',   () => showPage(currentPage + 1));
+  btnFloorPlan.addEventListener('click', () => planActive ? exitFloorPlan() : enterFloorPlan());
+  prevBtn.addEventListener('click', () => showPage(currentPage - 1));
+  nextBtn.addEventListener('click', () => showPage(currentPage + 1));
 
+  zoomInBtn.addEventListener('click',  () => { tf.scale = Math.min(2.5, tf.scale * 1.2); applyTransform(); });
+  zoomOutBtn.addEventListener('click', () => { tf.scale = Math.max(0.25, tf.scale * 0.83); applyTransform(); });
+  resetBtn.addEventListener('click',   resetTransform);
+
+  // Pan via mouse drag
+  stage.addEventListener('mousedown', e => {
+    if (e.button !== 0) return;
+    drag = { sx: e.clientX, sy: e.clientY, ox: tf.x, oy: tf.y };
+    stage.classList.add('dragging');
+  });
+  window.addEventListener('mousemove', e => {
+    if (!drag) return;
+    tf.x = drag.ox + (e.clientX - drag.sx) / tf.scale;
+    tf.y = drag.oy + (e.clientY - drag.sy) / tf.scale;
+    applyTransform();
+  });
+  window.addEventListener('mouseup', () => {
+    if (drag) { drag = null; stage.classList.remove('dragging'); }
+  });
+
+  // Zoom via wheel
+  stage.addEventListener('wheel', e => {
+    e.preventDefault();
+    tf.scale = Math.max(0.25, Math.min(2.5, tf.scale * (e.deltaY < 0 ? 1.1 : 0.9)));
+    applyTransform();
+  }, { passive: false });
+
+  // Keyboard
   document.addEventListener('keydown', e => {
     if (!planActive) return;
-    if (e.key === 'ArrowLeft'  || e.key === 'ArrowUp')    showPage(currentPage - 1);
+    if (e.key === 'ArrowLeft'  || e.key === 'ArrowUp')   showPage(currentPage - 1);
     if (e.key === 'ArrowRight' || e.key === 'ArrowDown')  showPage(currentPage + 1);
-    if (e.key === 'Escape') showMap();
+    if (e.key === 'Escape') exitFloorPlan();
   });
 }
