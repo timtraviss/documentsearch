@@ -7,6 +7,7 @@ import { initProperty }  from './js/panels/property.js';
 import { initTides }     from './js/panels/tides.js';
 import { initFloorPlan } from './js/floorplan.js';
 import { initFocus }     from './js/focus.js';
+import { initChat }      from './js/panels/chat.js';
 import { applyState }    from './js/state.js';
 
 applyState();
@@ -14,6 +15,7 @@ const { map } = initMap();
 initTheme(map);
 initAdmin();
 initFocus();
+initChat();
 const clock = initClock();
 initWeather(clock);
 initProperty();
