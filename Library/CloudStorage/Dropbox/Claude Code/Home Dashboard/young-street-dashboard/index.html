@@ -40,6 +40,13 @@
     </button>
     <button id="btn-focus" class="ctrl-btn" aria-label="Hide panels">
     </button>
+    <button id="btn-chat" class="ctrl-btn" aria-label="Open House Brain">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+        <line x1="9" y1="10" x2="15" y2="10"/>
+        <line x1="9" y1="14" x2="13" y2="14"/>
+      </svg>
+    </button>
     <button id="btn-admin" class="ctrl-btn" aria-label="Open admin panel">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
         <circle cx="12" cy="12" r="3"/>
@@ -146,6 +153,42 @@
       <span class="dot"></span>
       <span class="live">● Live</span>
     </footer>
+  </aside>
+
+  <!-- Chat scrim -->
+  <div class="chat-scrim" id="chat-scrim"></div>
+
+  <!-- Chat drawer (slide-in from left) -->
+  <aside class="chat-drawer" id="chat-drawer">
+    <header class="chat-head">
+      <div class="chat-head-left">
+        <div class="chat-eyebrow">house-brain</div>
+        <div class="chat-title">~/11-young-st</div>
+      </div>
+      <button class="chat-close" id="chat-close" aria-label="Close">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+          <path d="M18 6 6 18M6 6l12 12"/>
+        </svg>
+      </button>
+    </header>
+
+    <div class="chat-messages" id="chat-messages">
+      <div class="chat-welcome">
+        <span class="chat-prompt">❯</span>
+        <span class="chat-welcome-text">Ask anything about the property…</span>
+      </div>
+    </div>
+
+    <div class="chat-input-row">
+      <span class="chat-prompt">❯</span>
+      <input type="text" id="chat-input" class="chat-input" placeholder="ask about the house" autocomplete="off" spellcheck="false">
+      <button id="chat-send" class="chat-send" aria-label="Send">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="12" y1="19" x2="12" y2="5"/>
+          <polyline points="5 12 12 5 19 12"/>
+        </svg>
+      </button>
+    </div>
   </aside>
 
   <!-- Floor plan page navigation -->
