@@ -104,7 +104,7 @@ html.light .vignette {
   box-shadow:
     0 20px 50px -20px rgba(0, 0, 0, 0.7),
     0 0 0 1px rgba(255,255,255,0.02) inset;
-  transition: background 0.2s, border-color 0.2s;
+  transition: background 0.2s, border-color 0.2s, transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 /* ----- Panel positions ----- */
@@ -121,6 +121,7 @@ html.light .vignette {
   flex-direction: column;
   gap: 12px;
   overflow: hidden;
+  transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
 }
 .panel-tr-col .panel { position: relative; top: auto; right: auto; min-height: 0; overflow: hidden; padding: 0; display: flex; flex-direction: column; }
 .panel-weather { flex: 3 1 0; }
@@ -142,6 +143,7 @@ html.light .vignette {
   display: flex;
   flex-direction: column;
   gap: 8px;
+  transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
 }
 .ctrl-btn {
   width: 38px; height: 38px;
@@ -159,6 +161,12 @@ html.light .vignette {
 .ctrl-btn:hover  { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
 .ctrl-btn:active { transform: scale(0.95); }
 .ctrl-btn.active { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
+
+/* ----- Focus mode — slide all panels off screen ----- */
+body.panels-hidden .panel-tl     { transform: translateX(calc(-100% - 40px)); }
+body.panels-hidden .panel-bl     { transform: translateY(calc(100% + 40px)); }
+body.panels-hidden .panel-tr-col { transform: translateX(calc(100% + 40px)); }
+body.panels-hidden .controls     { transform: translateX(276px); }
 
 /* ----- Clock ----- */
 .clock-time {
