@@ -117,15 +117,18 @@ function renderSVG(allEntries, todayEntries, now) {
   return `<svg class="tide-svg" viewBox="0 0 ${SVG_W} ${SVG_H}" width="100%" xmlns="http://www.w3.org/2000/svg">
     <defs>
       <linearGradient id="tideFill" x1="0" y1="0" x2="0" y2="1">
-        <stop offset="0%"   stop-color="#34d399" stop-opacity="0.18"/>
-        <stop offset="100%" stop-color="#34d399" stop-opacity="0.02"/>
+        <stop offset="0%"   stop-color="var(--accent)" stop-opacity="0.18"/>
+        <stop offset="100%" stop-color="var(--accent)" stop-opacity="0.02"/>
       </linearGradient>
     </defs>
     <path d="${fillD}" fill="url(#tideFill)"/>
-    <path d="${pathD}" fill="none" stroke="#34d399" stroke-width="1.5" stroke-linejoin="round"/>
+    <path d="${pathD}" fill="none" stroke="var(--accent)" stroke-width="1.5" stroke-linejoin="round"/>
     <line x1="${nowX}" y1="${PAD_Y}" x2="${nowX}" y2="${bottom}"
           stroke="rgba(237,242,247,0.35)" stroke-width="1" stroke-dasharray="2,2"/>
-    <circle cx="${nowX}" cy="${nowY}" r="2.8" fill="white" stroke="#34d399" stroke-width="1.5"/>
+    <circle cx="${nowX}" cy="${nowY}" r="4.5" fill="rgba(8,18,28,0.9)" stroke="var(--accent)" stroke-width="1.2"/>
+    <circle cx="${nowX}" cy="${nowY}" r="2.5" fill="#fff">
+      <animate attributeName="r" values="2.5;3.5;2.5" dur="2.4s" repeatCount="indefinite"/>
+    </circle>
     ${dots}
     ${labels}
   </svg>`;
@@ -163,30 +166,39 @@ function renderTides(allEntries) {
   const next = upcoming[0];
 
   const callout = next ? `
-    <div class="tide-callout">
-      <span class="tide-callout-type tide-${next.type}">${next.type === 'H' ? '▲ High' : '▼ Low'}</span>
-      <span class="tide-callout-height">${next.value.toFixed(2)} m</span>
-      <span class="tide-callout-when">in ${fmtCountdown(next.time - now)}</span>
+    <div class="tide-next">
+      <span class="tide-next-arr">${next.type === 'H' ? '▲' : '▼'}</span>
+      <span class="tide-next-name">${next.type === 'H' ? 'High' : 'Low'}</span>
+      <span class="tide-next-h">${next.value.toFixed(2)} m</span>
+      <span class="tide-next-eta">in ${fmtCountdown(next.time - now)}</span>
     </div>` : '';
 
-  const rows = tableEntries.map(t => {
+  // Build grid rows (CSS display: contents)
+  const gridRows = tableEntries.map(t => {
     const past   = t.time < now;
     const isNext = next && t.time.getTime() === next.time.getTime();
-    return `<tr class="${past ? 'tide-past' : ''}${isNext ? ' tide-next-row' : ''}">
-      <td class="tide-${t.type}">${t.type === 'H' ? 'High' : 'Low'}</td>
-      <td>${fmtTime(t.time)}</td>
-      <td>${t.value.toFixed(2)} m</td>
-    </tr>`;
+    let cls = past ? 'past' : (isNext ? 'next' : 'future');
+    return `<div class="row ${cls}">
+      <span class="t-type">${t.type === 'H' ? 'High' : 'Low'}</span>
+      <span class="t-time">${fmtTime(t.time)}</span>
+      <span class="t-height">${t.value.toFixed(2)} m</span>
+    </div>`;
   }).join('');
 
   return `
-    <div class="tides-header">Tides — Mahurangi</div>
-    ${renderSVG(allEntries, todayEntries, now)}
+    <div class="tide-header-row">
+      <div class="tide-title">
+        <span class="accent">Tides</span>
+        <span class="dash"> — </span>
+        <span>Mahurangi</span>
+      </div>
+    </div>
+    <div class="tide-chart-wrap">${renderSVG(allEntries, todayEntries, now)}</div>
     ${callout}
-    <table class="tides-table">
-      <thead><tr><th>Type</th><th>Time</th><th>Height</th></tr></thead>
-      <tbody>${rows}</tbody>
-    </table>`;
+    <div class="tide-table2">
+      <div class="row head"><span>Type</span><span>Time</span><span>Height</span></div>
+      ${gridRows}
+    </div>`;
 }
 
 export async function initTides() {
