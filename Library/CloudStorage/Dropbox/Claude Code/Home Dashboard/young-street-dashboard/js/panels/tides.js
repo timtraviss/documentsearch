@@ -104,7 +104,7 @@ function renderSVG(allEntries, todayEntries, now) {
   const dots = todayEntries.map(e => {
     const cx   = toX(e.time.getTime()).toFixed(1);
     const cy   = toY(e.value).toFixed(1);
-    const fill = e.type === 'H' ? '#34d399' : 'rgba(237,242,247,0.35)';
+    const fill = e.type === 'H' ? 'var(--accent)' : 'rgba(237,242,247,0.35)';
     return `<circle cx="${cx}" cy="${cy}" r="2.5" fill="${fill}"/>`;
   }).join('');
 
