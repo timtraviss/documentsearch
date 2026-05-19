@@ -1,3 +1,5 @@
+import { getContext } from '../dashboard-context.js';
+
 export function initChat() {
   const drawer   = document.getElementById('chat-drawer');
   const scrim    = document.getElementById('chat-scrim');
@@ -50,7 +52,11 @@ export function initChat() {
       const res = await fetch('/api/ask', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query: text, messages: history }),
+        body: JSON.stringify({
+          query: text,
+          messages: history,
+          dashboard_context: { current_time: new Date().toISOString(), ...getContext() },
+        }),
       });
       const data = await res.json();
       thinking.remove();

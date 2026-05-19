@@ -1,3 +1,5 @@
+import { setContext } from '../dashboard-context.js';
+
 const CSV_PATH = 'tides_31days_from_19May.csv';
 const TZ = 'Pacific/Auckland';
 
@@ -208,7 +210,16 @@ export async function initTides() {
       if (!r.ok) throw new Error(`HTTP ${r.status}`);
       return r.text();
     });
-    container.innerHTML = '<div class="tide-body">' + renderTides(classifyHL(parseCsv(text))) + '</div>';
+    const allEntries = classifyHL(parseCsv(text));
+    const upcoming = allEntries.filter(e => e.time > new Date());
+    setContext('tides', {
+      upcoming: upcoming.slice(0, 6).map(e => ({
+        type:     e.type === 'H' ? 'High' : 'Low',
+        time_iso: e.time.toISOString(),
+        height_m: e.value,
+      })),
+    });
+    container.innerHTML = '<div class="tide-body">' + renderTides(allEntries) + '</div>';
   } catch (err) {
     console.error('[tides]', err);
     container.innerHTML = '<div class="tide-body"><div class="tides-unavailable">⚠ Tide data unavailable</div></div>';

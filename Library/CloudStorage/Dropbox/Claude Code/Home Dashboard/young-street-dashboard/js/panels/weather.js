@@ -1,4 +1,5 @@
 import { OPENWEATHER_KEY } from '../../config.js';
+import { setContext } from '../dashboard-context.js';
 
 const LAT = -36.4751;
 const LNG = 174.7354;
@@ -115,6 +116,17 @@ export async function initWeather(clock) {
     // Dew point approximation: Td ≈ T - (100 - RH)/5
     const dewPt    = Math.round(cur.main.temp - (100 - cur.main.humidity) / 5);
     const condUC   = cond.description.replace(/^\w/, c => c.toUpperCase());
+
+    setContext('weather', {
+      temp_c:           Math.round(cur.main.temp),
+      feels_like_c:     Math.round(cur.main.feels_like),
+      conditions:       condUC,
+      humidity_pct:     cur.main.humidity,
+      wind_knots:       speedKn,
+      wind_dir:         dir,
+      uv_index:         uvi,
+      forecast_3day:    daily.map(d => ({ date: d.date, high_c: d.high, low_c: d.low, rain_chance_pct: d.pop })),
+    });
 
     const forecastHTML = daily.map(d => `
       <div class="wx-fc">

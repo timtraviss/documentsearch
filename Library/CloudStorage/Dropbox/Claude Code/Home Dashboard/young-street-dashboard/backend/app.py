@@ -79,6 +79,7 @@ def api_ask():
     body = request.get_json(force=True) or {}
     query = (body.get('query') or '').strip()
     messages = body.get('messages') or []
+    dashboard_ctx = body.get('dashboard_context') or {}
 
     if not query:
         return jsonify({'error': 'query required'}), 400
@@ -102,24 +103,37 @@ def api_ask():
         for c in chunks
     )
 
+    dashboard_section = (
+        f'\n\nCURRENT DASHBOARD STATE:\n{json.dumps(dashboard_ctx, indent=2)}'
+        if dashboard_ctx else ''
+    )
+
     system_prompt = (
         'You are the House Brain for 11 Young Street, Scotts Landing, '
         'Mahurangi East, New Zealand.\n'
-        'Answer questions about the property using the facts and document excerpts provided. '
-        'Be concise. Cite the document name when you draw from it.\n\n'
+        'Answer questions about the property using the facts, document excerpts, '
+        'and current dashboard state provided. '
+        'Be concise. Cite the document name when you draw from it.\n'
+        'Do not use markdown formatting — no bold, no headers, no asterisks. '
+        'Use plain text only. For lists, start each item with a dash.\n\n'
         f'PROPERTY FACTS:\n{property_ctx}\n\n'
         f'RELEVANT DOCUMENT EXCERPTS:{doc_ctx or " (none — index not yet built)"}'
+        f'{dashboard_section}'
     )
 
     history = [m for m in messages if m.get('role') in ('user', 'assistant')]
     history.append({'role': 'user', 'content': query})
 
-    resp = _ant().messages.create(
-        model='claude-sonnet-4-6',
-        max_tokens=1024,
-        system=system_prompt,
-        messages=history,
-    )
+    try:
+        resp = _ant().messages.create(
+            model='claude-sonnet-4-6',
+            max_tokens=1024,
+            system=system_prompt,
+            messages=history,
+        )
+    except Exception as exc:
+        return jsonify({'error': str(exc)}), 500
+
     answer = resp.content[0].text
 
     seen = set()
