@@ -1,7 +1,7 @@
 import os
 import json
 import threading
-from flask import Flask, send_from_directory, jsonify
+from flask import Flask, send_from_directory, jsonify, request
 from dotenv import load_dotenv
 from anthropic import Anthropic
 
@@ -28,15 +28,18 @@ _index_state = {
     'log':          [],
     'error':        None,
 }
+_log_lock = threading.Lock()
 
 
 def _run_index(folder):
     _index_state['running'] = True
-    _index_state['log'] = []
+    with _log_lock:
+        _index_state['log'] = []
     _index_state['error'] = None
 
     def log(msg):
-        _index_state['log'].append(msg)
+        with _log_lock:
+            _index_state['log'].append(msg)
         _index_state['progress'] = msg
 
     try:
@@ -53,6 +56,7 @@ def _run_index(folder):
         docs = get_all_documents_with_text()
         build_embeddings(docs, progress_callback=log)
         log('Complete')
+        _index_state['error'] = None
     except Exception as exc:
         _index_state['error'] = str(exc)
         log(f'ERROR: {exc}')
@@ -72,7 +76,6 @@ def health():
 
 @app.route('/api/ask', methods=['POST'])
 def api_ask():
-    from flask import request
     body = request.get_json(force=True) or {}
     query = (body.get('query') or '').strip()
     messages = body.get('messages') or []
@@ -135,7 +138,6 @@ def api_ask():
 
 @app.route('/api/index', methods=['POST'])
 def api_index():
-    from flask import request
     if _index_state['running']:
         return jsonify({'status': 'already_running'}), 409
 
@@ -158,10 +160,13 @@ def api_index_status():
         doc_count    = 0
         last_indexed = None
 
+    with _log_lock:
+        log_copy = list(_index_state['log'][-5:])
+
     return jsonify({
         'running':      _index_state['running'],
         'progress':     _index_state['progress'],
-        'log':          list(_index_state['log'][-5:]),
+        'log':          log_copy,
         'error':        _index_state['error'],
         'doc_count':    doc_count,
         'last_indexed': last_indexed,
