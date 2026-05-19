@@ -136,10 +136,81 @@ export function initAdmin() {
     updateThemeBtns();
   });
 
+
+  // House Brain — Index Documents
+  const hbBtn    = document.getElementById('hb-index-btn');
+  const hbLog    = document.getElementById('hb-log');
+  const hbStatus = document.getElementById('hb-status');
+  let hbPollTimer = null;
+
+  async function hbStartIndex() {
+    hbBtn.disabled = true;
+    hbLog.innerHTML = '';
+    hbStatus.textContent = 'Starting…';
+    try {
+      const res = await fetch('/api/index', { method: 'POST' });
+      const data = await res.json();
+      if (res.ok) {
+        hbPollTimer = setInterval(hbPollStatus, 2000);
+      } else {
+        hbStatus.textContent = data.error || 'Error starting index';
+        hbBtn.disabled = false;
+      }
+    } catch {
+      hbStatus.textContent = 'Server unreachable';
+      hbBtn.disabled = false;
+    }
+  }
+
+  async function hbPollStatus() {
+    try {
+      const res  = await fetch('/api/index/status');
+      const data = await res.json();
+
+      hbLog.innerHTML = (data.log || [])
+        .map(l => `<span>${escAdminHtml(l)}</span>`)
+        .join('');
+
+      if (data.last_indexed && data.doc_count) {
+        const d = new Date(data.last_indexed);
+        const fmt = d.toLocaleDateString('en-NZ', { day:'numeric', month:'short', year:'numeric' });
+        hbStatus.textContent = `Last indexed: ${fmt} · ${data.doc_count} documents`;
+      }
+
+      if (data.error) {
+        hbStatus.textContent = `Error: ${data.error}`;
+      }
+
+      if (!data.running) {
+        clearInterval(hbPollTimer);
+        hbPollTimer = null;
+        hbBtn.disabled = false;
+        if (!data.error) hbStatus.textContent += ' ✓';
+      }
+    } catch {
+      // server may be restarting — keep polling
+    }
+  }
+
+  function escAdminHtml(str) {
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+  }
+
+  hbBtn.addEventListener('click', hbStartIndex);
+
+  // Show status on admin open
+  hbPollStatus();
+
   // Init controls to match persisted state
   updateThemeBtns();
 }
 
 function updateSliderTrack(input, pct) {
   input.style.setProperty('--p', pct.toFixed(1) + '%');
+
+
+
 }

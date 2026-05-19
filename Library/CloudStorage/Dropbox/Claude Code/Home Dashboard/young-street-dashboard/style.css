@@ -973,3 +973,42 @@ html.light .tog-row { background: rgba(255,255,255,0.3); }
   flex-shrink: 0;
 }
 .chat-send:hover { background: rgba(var(--accent-rgb, 52,211,153), 0.25); }
+
+/* ─── Admin: House Brain section ──────────────────── */
+
+.hb-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 14px;
+  background: rgba(var(--accent-rgb, 52,211,153), 0.12);
+  border: 1px solid rgba(var(--accent-rgb, 52,211,153), 0.3);
+  border-radius: 8px;
+  color: var(--accent, #34d399);
+  font-size: 12px;
+  cursor: pointer;
+  transition: background .15s;
+}
+.hb-btn:hover:not(:disabled) { background: rgba(var(--accent-rgb, 52,211,153), 0.22); }
+.hb-btn:disabled { opacity: .5; cursor: not-allowed; }
+
+.hb-log {
+  margin-top: 8px;
+  font-family: 'Electrolize', monospace;
+  font-size: 10px;
+  color: rgba(255,255,255,0.35);
+  line-height: 1.6;
+  min-height: 0;
+  max-height: 64px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.hb-status {
+  margin-top: 6px;
+  font-size: 10px;
+  color: rgba(255,255,255,0.35);
+}
