@@ -81,7 +81,7 @@ function fmtDate(dateStr) {
 
 export async function initWeather(clock) {
   const container = document.getElementById('panel-weather');
-  container.innerHTML = '<div class="weather-loading">Loading weather…</div>';
+  container.innerHTML = '<div class="wx-body"><div class="weather-loading">Loading weather…</div></div>';
 
   try {
     const [curResult, fcResult, uviResult] = await Promise.allSettled([
@@ -125,7 +125,7 @@ export async function initWeather(clock) {
       </div>
     `).join('');
 
-    container.innerHTML = `
+    container.innerHTML = `<div class="wx-body">
       <div class="wx-hero">
         <span class="wx-emoji">${owIcon(cond.id)}</span>
         <div>
@@ -179,9 +179,9 @@ export async function initWeather(clock) {
       </div>
 
       <div class="wx-forecast">${forecastHTML}</div>
-    `;
+    </div>`;
   } catch (err) {
     console.error('[weather]', err);
-    container.innerHTML = '<div class="weather-unavailable">⚠ Weather unavailable</div>';
+    container.innerHTML = '<div class="wx-body"><div class="weather-unavailable">⚠ Weather unavailable</div></div>';
   }
 }

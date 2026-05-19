@@ -21,6 +21,12 @@
       "provider": "Genesis Energy",
       "customerNumber": "100 378 8281",
       "phone": "0800 300 400"
+    },
+    {
+      "type": "Broadband",
+      "provider": "Spark",
+      "customerNumber": "166-081 5909",
+      "phone": ""
     }
   ],
   "floorPlan": {

@@ -208,9 +208,9 @@ export async function initTides() {
       if (!r.ok) throw new Error(`HTTP ${r.status}`);
       return r.text();
     });
-    container.innerHTML = renderTides(classifyHL(parseCsv(text)));
+    container.innerHTML = '<div class="tide-body">' + renderTides(classifyHL(parseCsv(text))) + '</div>';
   } catch (err) {
     console.error('[tides]', err);
-    container.innerHTML = '<div class="tides-unavailable">⚠ Tide data unavailable</div>';
+    container.innerHTML = '<div class="tide-body"><div class="tides-unavailable">⚠ Tide data unavailable</div></div>';
   }
 }

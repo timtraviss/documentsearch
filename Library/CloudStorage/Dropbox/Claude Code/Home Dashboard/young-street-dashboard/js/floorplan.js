@@ -27,11 +27,11 @@ export function initFloorPlan(map) {
   let drag = null;
 
   function applyTransform() {
-    canvas.style.transform = `translate(-50%, -50%) scale(${tf.scale}) translate(${tf.x}px, ${tf.y}px)`;
+    canvas.style.transform = `translate(calc(-50% + ${tf.x}px), calc(-50% + ${tf.y}px)) scale(${tf.scale})`;
   }
 
   function resetTransform() {
-    tf = { x: -600, y: -400, scale: 0.55 };
+    tf = { x: 0, y: 0, scale: 0.55 };
     applyTransform();
   }
 
