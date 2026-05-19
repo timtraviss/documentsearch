@@ -22,9 +22,6 @@ function windDir(deg) {
   return ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'][Math.round(deg / 45) % 8];
 }
 
-function windArrow(deg) {
-  return `<svg width="11" height="11" viewBox="0 0 11 11" xmlns="http://www.w3.org/2000/svg" style="vertical-align:middle;margin-right:3px"><g transform="rotate(${deg},5.5,5.5)"><polygon points="5.5,1 4,8 7,8" fill="currentColor"/></g></svg>`;
-}
 
 function uvLabel(uvi) {
   if (uvi <= 2)  return 'Low';
@@ -112,54 +109,76 @@ export async function initWeather(clock) {
 
     const cond  = cur.weather[0];
     const daily = parseDaily(fc.list);
-    const label = cond.description.replace(/^\w/, c => c.toUpperCase());
+    const speedKn  = Math.round(cur.wind.speed * 1.944);
+    const gustKn   = cur.wind.gust ? Math.round(cur.wind.gust * 1.944) : null;
+    const dir      = windDir(cur.wind.deg);
+    // Dew point approximation: Td ≈ T - (100 - RH)/5
+    const dewPt    = Math.round(cur.main.temp - (100 - cur.main.humidity) / 5);
+    const condUC   = cond.description.replace(/^\w/, c => c.toUpperCase());
 
     const forecastHTML = daily.map(d => `
-      <div class="forecast-day">
-        <div class="forecast-date">${fmtDate(d.date)}</div>
-        <div class="forecast-icon">${d.icon}</div>
-        <div class="forecast-pop">🌂 ${d.pop}%</div>
-        <div class="forecast-temps">${d.high}° / ${d.low}°</div>
+      <div class="wx-fc">
+        <span class="day">${fmtDate(d.date)}</span>
+        <span class="em">${d.icon}</span>
+        <span class="rain">${d.pop}%</span>
+        <span class="hl">${d.high}° <span class="lo">${d.low}°</span></span>
       </div>
     `).join('');
 
-    const speedKmh = Math.round(cur.wind.speed * 3.6);
-    const gustKmh  = cur.wind.gust ? Math.round(cur.wind.gust * 3.6) : null;
-    const dir      = windDir(cur.wind.deg);
-
     container.innerHTML = `
-      <div class="weather-hero">
-        <span class="weather-icon">${owIcon(cond.id)}</span>
+      <div class="wx-hero">
+        <span class="wx-emoji">${owIcon(cond.id)}</span>
         <div>
-          <div class="weather-temp">${Math.round(cur.main.temp)}<span class="weather-unit">°C</span></div>
-          <div class="weather-condition">${label}</div>
+          <div class="wx-temp">${Math.round(cur.main.temp)}<span class="deg">°</span></div>
+          <div class="wx-cond">${condUC}</div>
         </div>
       </div>
 
-      <div class="weather-metrics">
+      <div class="wx-grid">
         <div class="wx-card">
-          <div class="wx-card-label">Wind</div>
-          <div class="wx-card-value">${speedKmh}<span class="wx-card-unit"> km/h</span></div>
-          <div class="wx-card-sub wx-wind">${windArrow(cur.wind.deg)}${dir}${gustKmh ? ` · ${gustKmh} gust` : ''}</div>
+          <span class="label">Wind</span>
+          <div class="value">${speedKn}<span style="font-size:11px;color:var(--text-dim);font-weight:400;margin-left:3px">kn</span></div>
+          <div class="detail">${dir} ${cur.wind.deg}°${gustKn ? ` · ${gustKn} gust` : ''}</div>
+          <div class="corner">
+            <svg width="14" height="14" viewBox="0 0 24 24" style="transform:rotate(${cur.wind.deg}deg);transition:transform 0.6s">
+              <path d="M12 3 L17 13 L12 10 L7 13 Z" fill="currentColor"/>
+            </svg>
+          </div>
         </div>
         <div class="wx-card">
-          <div class="wx-card-label">UV Index</div>
-          <div class="wx-card-value">${uvi !== null ? uvi : '—'}</div>
-          <div class="wx-card-sub">${uvi !== null ? uvLabel(uvi) : 'No data'}</div>
+          <span class="label">UV Index</span>
+          <div class="value">${uvi !== null ? uvi : '—'}</div>
+          <div class="detail">${uvi !== null ? uvLabel(uvi) : 'No data'}</div>
+          <div class="corner">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+              <circle cx="12" cy="12" r="4"/>
+              <path d="M12 3v2M12 19v2M3 12h2M19 12h2M5.5 5.5l1.4 1.4M17.1 17.1l1.4 1.4M5.5 18.5l1.4-1.4M17.1 6.9l1.4-1.4"/>
+            </svg>
+          </div>
         </div>
         <div class="wx-card">
-          <div class="wx-card-label">Humidity</div>
-          <div class="wx-card-value">${cur.main.humidity}<span class="wx-card-unit">%</span></div>
-          <div class="wx-card-sub">Cloud ${cur.clouds.all}%</div>
+          <span class="label">Humidity</span>
+          <div class="value">${cur.main.humidity}<span style="font-size:11px;color:var(--text-dim);font-weight:400;margin-left:3px">%</span></div>
+          <div class="detail">Dew pt · ${dewPt}°</div>
+          <div class="corner">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M12 2 C 7 9, 5 13, 5 16 a7 7 0 0 0 14 0 c 0-3 -2-7 -7-14 z" opacity="0.85"/>
+            </svg>
+          </div>
         </div>
         <div class="wx-card">
-          <div class="wx-card-label">Feels Like</div>
-          <div class="wx-card-value">${Math.round(cur.main.feels_like)}<span class="wx-card-unit">°</span></div>
-          <div class="wx-card-sub">${cur.main.pressure} hPa</div>
+          <span class="label">Feels Like</span>
+          <div class="value">${Math.round(cur.main.feels_like)}<span style="font-size:11px;color:var(--text-dim);font-weight:400;margin-left:3px">°C</span></div>
+          <div class="detail">${cur.main.pressure} hPa</div>
+          <div class="corner">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+              <path d="M10 4 a2 2 0 0 1 4 0 v9 a4 4 0 1 1 -4 0 z"/>
+            </svg>
+          </div>
         </div>
       </div>
 
-      <div class="weather-forecast">${forecastHTML}</div>
+      <div class="wx-forecast">${forecastHTML}</div>
     `;
   } catch (err) {
     console.error('[weather]', err);
