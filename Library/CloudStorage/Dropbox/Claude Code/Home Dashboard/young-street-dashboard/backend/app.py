@@ -1,5 +1,4 @@
 import os
-import sys
 from flask import Flask, send_from_directory, jsonify
 from dotenv import load_dotenv
 
