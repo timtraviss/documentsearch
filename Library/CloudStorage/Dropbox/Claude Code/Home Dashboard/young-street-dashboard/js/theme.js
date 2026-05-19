@@ -1,32 +1,22 @@
-export function initTheme(map, layers) {
-  const html  = document.documentElement;
-  const btn   = document.getElementById('theme-toggle');
-  let userPickedLayer = false;
+import { state, setState, applyState } from './state.js';
 
-  // Detect when user manually switches base layer via the Leaflet control
-  map.on('baselayerchange', () => { userPickedLayer = true; });
+const MOON_SVG = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>`;
+const SUN_SVG  = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>`;
 
-  function applyTheme(theme) {
-    html.setAttribute('data-theme', theme);
-    btn.textContent = theme === 'dark' ? '☀️' : '🌙';
+export function initTheme(map) {
+  const btn = document.getElementById('btn-theme');
 
-    if (!userPickedLayer) {
-      const target = theme === 'dark' ? layers.satellite : layers.standard;
-      // Remove whichever base layer is currently active
-      [layers.standard, layers.satellite, layers.topo].forEach(l => {
-        if (map.hasLayer(l)) map.removeLayer(l);
-      });
-      target.addTo(map);
-    }
-
-    // After a theme switch, reset so the NEXT switch can auto-pick again
-    userPickedLayer = false;
+  function updateBtn() {
+    btn.innerHTML = state.theme === 'dark' ? MOON_SVG : SUN_SVG;
+    if (map) setTimeout(() => map.invalidateSize(), 50);
   }
 
   btn.addEventListener('click', () => {
-    const current = html.getAttribute('data-theme');
-    applyTheme(current === 'dark' ? 'light' : 'dark');
+    setState({ theme: state.theme === 'dark' ? 'light' : 'dark' });
+    updateBtn();
   });
 
-  // Dark is already set in HTML; no further init needed
+  // Apply stored state on load
+  applyState();
+  updateBtn();
 }
