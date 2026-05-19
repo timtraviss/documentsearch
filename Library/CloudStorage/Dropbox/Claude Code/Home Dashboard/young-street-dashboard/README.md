@@ -1,23 +1,40 @@
 # 11 Young Street — Property Dashboard
 
-A personal property dashboard for 11 Young Street, Scotts Landing, Mahurangi East, NZ. Built as a local web app: no build step, no npm, no server required beyond serving ES modules.
+A personal property dashboard for 11 Young Street, Scotts Landing, Mahurangi East, NZ. Built as a local web app: no build step, no npm, no bundler — plain HTML, CSS, and vanilla ES modules served by a Flask backend.
 
-## How to open
+## How to run
 
-**Requires a local server** (ES modules + `fetch()` don't work on `file://`):
+### 1. Install Python dependencies
 
 ```bash
-cd young-street-dashboard
-python3 -m http.server 8080
+cd young-street-dashboard/backend
+pip3 install -r requirements.txt
+```
+
+### 2. Configure API keys
+
+Create `backend/.env` (gitignored):
+
+```
+ANTHROPIC_API_KEY=sk-ant-...
+OPENAI_API_KEY=sk-...
+DOCUMENTS_FOLDER=/path/to/your/11 Young Street/
+PORT=8080
+```
+
+Create `config.js` in the dashboard root (gitignored):
+
+```js
+export const OPENWEATHER_KEY = 'your_openweather_key_here';
+```
+
+### 3. Start the server
+
+```bash
+cd backend && python3 app.py
 ```
 
 Then open `http://localhost:8080`.
-
-**API key:** Create `config.js` in the dashboard root (gitignored):
-
-```js
-export const OPENWEATHER_KEY = 'your_key_here';
-```
 
 ---
 
@@ -25,53 +42,59 @@ export const OPENWEATHER_KEY = 'your_key_here';
 
 ### Map
 - Full-screen interactive map (Leaflet.js 1.9.4) centred on the property at zoom 17
-- Three tile layers switchable via bottom-right control:
-  - **Satellite** — Esri World Imagery (default)
-  - **Standard** — OpenStreetMap
-  - **Topographic** — OpenTopoMap
+- Three tile layers: **Satellite** (Esri, default), **Standard** (OSM), **Topographic**
 - Property marker with popup
 
 ### Floor plan viewer
-- Toggle between map and floor plan via the 📐 button (top-right)
-- PDF pages converted to PNG via `convert-plans.py` (PyMuPDF) and stored in `plans/`
+- Toggle between map and floor plan via the 📐 button
+- PDF pages converted to PNG via `convert-plans.py` (PyMuPDF), stored in `plans/`
 - Pan and zoom with Leaflet CRS.Simple; keyboard arrow keys page through plans
-- Page count stored in `property.json` — the toggle button is hidden if no plans are present
+- Page count stored in `property.json` — button hidden if no plans are present
 
 ### Theme
-- Dark / light toggle (top-right button)
-- Emerald green accent (`#34d399`) throughout
+- Dark / light toggle with emerald green accent (`#34d399`)
 - Frosted-glass panels using `backdrop-filter: blur()`
 - Theme switch auto-swaps map layer; manual layer picks are respected
 
-### Clock panel (top-left)
-- Live time and date, Auckland timezone, 24-hour format
-- Electrolize monospace font
-- Sunrise / sunset times shown with SVG icons — populated by the weather fetch
+### Admin panel
+- Slide-in panel (⚙ button) for theme, accent colour, opacity, blur, and vignette controls
+- **House Brain** section: Index Documents button triggers background PDF scan + embedding build; shows live log and last-indexed timestamp
 
-### Weather panel (top-right)
-- Current temperature, condition (emoji + label), feels-like, humidity, cloud cover
-- UV index and pressure
-- Wind speed, direction, and gust — with an animated SVG compass rose
+### Clock panel
+- Live time and date, Auckland timezone, 24-hour format, Electrolize monospace font
+- Sunrise / sunset times populated by the weather fetch
+
+### Weather panel
+- Current temperature, condition, feels-like, humidity, UV index, pressure
+- Wind speed, direction, and gust with animated SVG compass rose
 - 3-day forecast strip
-- Data source: OpenWeather API 2.5 (key required in `config.js`)
+- Source: OpenWeather API 2.5
 
-### Tides panel (top-right, below weather)
+### Tides panel
 - Smooth cosine-interpolated SVG tide curve for the current Auckland day
-- "Now" marker (white dot + dashed line) showing current position in the tide cycle
+- "Now" marker showing current position in the tide cycle
 - Next tide callout: type, height, and countdown
-- Compact H/L table below the chart; past tides dimmed, next tide highlighted
-- Data source: NIWA CSV (`tides_31days_from_19May.csv`) — update this file periodically
+- H/L table; past tides dimmed, next tide highlighted
+- Source: NIWA CSV (`tides_31days_from_19May.csv`) — update periodically
 
-### Property panel (bottom-left)
+### Property panel
 Three tabs:
 
 | Tab | Contents |
 |-----|----------|
-| Overview | Address, legal description, builder, build year, rates details, valuations, utilities |
+| Overview | Address, legal description, builder, build year, rates, valuations, utilities |
 | Contacts | Trade/supplier contacts from `contacts.json`; live search; phone and email links |
 | Documents | Link to the Dropbox `11 Young Street` folder |
 
-All property data lives in `property.json` — edit it there, not in the code.
+All property data lives in `property.json`.
+
+### House Brain (AI chat)
+- Slide-in chat drawer (brain icon) powered by Claude (`claude-sonnet-4-6`)
+- Answers questions about the property grounded in indexed documents (LIM, title, insurance, CoC, manuals)
+- Vector search via FAISS + OpenAI embeddings (`text-embedding-3-small`) for relevant document excerpts
+- Cites source documents in responses
+- Live dashboard context (current weather, upcoming tides, time) sent with every query
+- In-memory conversation history per session
 
 ---
 
@@ -82,24 +105,39 @@ young-street-dashboard/
 ├── index.html
 ├── app.js
 ├── style.css
-├── config.js              ← gitignored — add your OpenWeather key here
+├── config.js              ← gitignored — OpenWeather key
 ├── property.json          ← all property data
 ├── contacts.json          ← trade/supplier contacts
-├── tides_31days_from_19May.csv  ← NIWA tide data (refresh periodically)
-├── convert-plans.py       ← converts PDF floor plans to plans/*.png
+├── tides_31days_from_19May.csv
+├── convert-plans.py
 ├── fonts/
 │   └── Electrolize-Regular.ttf
 ├── plans/                 ← generated PNG pages (gitignored)
-│   └── page-01.png …
+├── backend/
+│   ├── app.py             ← Flask server + API routes
+│   ├── database.py        ← SQLite document store
+│   ├── indexer.py         ← PDF scanner (mtime-based incremental)
+│   ├── embeddings.py      ← FAISS vector index + OpenAI embeddings
+│   ├── requirements.txt
+│   ├── .env               ← gitignored — API keys + config
+│   └── tests/
+│       ├── test_database.py
+│       ├── test_embeddings.py
+│       └── test_indexer.py
 └── js/
     ├── map.js
     ├── theme.js
     ├── floorplan.js
+    ├── focus.js
+    ├── state.js
+    ├── admin.js
+    ├── dashboard-context.js
     └── panels/
         ├── clock.js
         ├── weather.js
         ├── tides.js
-        └── property.js
+        ├── property.js
+        └── chat.js
 ```
 
 ---
@@ -108,21 +146,37 @@ young-street-dashboard/
 
 | Layer | Choice |
 |-------|--------|
+| Backend | Flask (Python) |
+| AI / LLM | Anthropic `claude-sonnet-4-6` |
+| Embeddings | OpenAI `text-embedding-3-small` |
+| Vector search | FAISS (IndexFlatL2) |
+| Document store | SQLite + FTS5 |
+| PDF extraction | pdfminer.six |
 | Map / floor plan | Leaflet.js 1.9.4 (CDN) |
-| Weather | OpenWeather API 2.5 (key required) |
+| Weather | OpenWeather API 2.5 |
 | Tides | NIWA CSV — cosine-interpolated SVG chart |
 | Font | Electrolize (local TTF) |
 | Styling | Vanilla CSS with custom properties |
 | JS | Vanilla ES modules — no bundler |
-| Hosting | Local server (`python3 -m http.server`) |
+
+---
+
+## Indexing documents
+
+1. Set `DOCUMENTS_FOLDER` in `backend/.env` to your folder of PDFs
+2. Open the dashboard → admin panel (⚙) → **Index Documents**
+3. Watch the live log — new files are indexed, unchanged files are skipped
+4. Once complete, the House Brain can answer questions from those documents
+
+Re-indexing is incremental: only new or modified PDFs are processed.
 
 ---
 
 ## Updating tide data
 
-1. Go to [NIWA Tide Forecaster](https://tides.niwa.co.nz) — use coordinates `-36.48, 174.734`, export as CSV
+1. Go to [NIWA Tide Forecaster](https://tides.niwa.co.nz) — coordinates `-36.48, 174.734`, export as CSV
 2. Replace `tides_31days_from_19May.csv` with the new file
-3. Update the `CSV_PATH` constant at the top of `js/panels/tides.js` to match the new filename
+3. Update `CSV_PATH` at the top of `js/panels/tides.js` to match the new filename
 
 ## Updating floor plans
 
@@ -131,16 +185,12 @@ young-street-dashboard/
 python3 convert-plans.py
 ```
 
-This exports each page to `plans/page-XX.png` and updates `property.json` with the page count.
-
 ---
 
 ## Future improvements
 
-- **Mapbox** — custom dark map style matching the dashboard theme; sharper satellite imagery
-- **Persistent theme** — save last-chosen theme to `localStorage`
+- **Mapbox** — custom dark map style matching the dashboard theme
 - **Tide data automation** — script to fetch and replace the CSV on a schedule
-- **Documents tab** — links or previews for LIM, title, DRH warranty, insurance summary
-- **Hosting** — deploy to Vercel/Netlify/Cloudflare Pages for tablet access without a local server
-- **AI chat panel** — Claude API for property Q&A (maintenance history, supplier lookups)
-- **PWA / offline** — Service Worker so the dashboard loads from cache without internet
+- **Hosting** — deploy to a server for tablet access without a local machine running
+- **LiveKit voice** — voice interface for the House Brain
+- **PWA / offline** — Service Worker so the dashboard loads from cache
