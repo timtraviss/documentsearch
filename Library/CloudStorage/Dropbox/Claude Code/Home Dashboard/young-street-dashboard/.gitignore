@@ -5,3 +5,12 @@ config.js
 .DS_Store
 js/.DS_Store
 plans/.DS_Store
+
+# Backend
+backend/.env
+backend/house.db
+backend/house.faiss
+backend/house_metadata.json
+backend/__pycache__/
+backend/tests/__pycache__/
+.superpowers/
