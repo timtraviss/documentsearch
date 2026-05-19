@@ -5,9 +5,11 @@ const SUN_SVG  = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" st
 
 export function initTheme(map) {
   const btn = document.getElementById('btn-theme');
+  if (!btn) return;
 
   function updateBtn() {
     btn.innerHTML = state.theme === 'dark' ? MOON_SVG : SUN_SVG;
+    // Leaflet needs a size hint after the map container's filter changes
     if (map) setTimeout(() => map.invalidateSize(), 50);
   }
 
@@ -16,7 +18,6 @@ export function initTheme(map) {
     updateBtn();
   });
 
-  // Apply stored state on load
-  applyState();
+  // app.js calls applyState() before us — just sync the button icon
   updateBtn();
 }
